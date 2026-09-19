@@ -51,6 +51,8 @@ export function Sidebar({ active }: { active: string }) {
   const router = useRouter();
 
   function handleLogout() {
+    // Clear auth cookie so proxy redirects to login on next visit
+    document.cookie = "gritfit_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     sessionStorage.removeItem("gritfit_user");
     router.push("/login");
   }

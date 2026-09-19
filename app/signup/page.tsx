@@ -56,6 +56,8 @@ export default function SignupPage() {
     // Simulate API call — replace with real registration endpoint
     await new Promise(r => setTimeout(r, 1200));
 
+    // Set auth cookie so the proxy can protect routes server-side
+    document.cookie = "gritfit_session=1; path=/; SameSite=Lax";
     // Store new user session
     sessionStorage.setItem("gritfit_user", JSON.stringify({
       name: `${fields.firstName} ${fields.lastName}`,

@@ -37,7 +37,9 @@ export default function LoginPage() {
     const validPassword = "gritfit123";
 
     if (fields.email === validEmail && fields.password === validPassword) {
-      // Store session (replace with real session management)
+      // Set auth cookie so the proxy can protect routes server-side
+      document.cookie = "gritfit_session=1; path=/; SameSite=Lax";
+      // Also keep a user info entry for display purposes
       sessionStorage.setItem("gritfit_user", JSON.stringify({ name: "Lance Bolo", email: fields.email, role: "Club Manager" }));
       router.push("/");
     } else {
