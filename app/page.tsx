@@ -1,69 +1,119 @@
-import Image from "next/image";
+"use client";
+
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="dashboard-shell">
+      <Sidebar active="dashboard" />
+
+      <section className="content" id="overview">
+        <header className="topbar"><h1>Executive Dashboard</h1><div className="top-actions"><label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search members, classes..." /></label><button className="status">● System Active</button><button className="icon-button" aria-label="Notifications">♧</button></div></header>
+
+        <div className="page-body">
+          <div className="metrics">
+            <Metric label="Active Members" value="2,481" delta="+12.4%" note="vs last month" icon="♟" />
+            <Metric label="Monthly Revenue" value="$48,290" delta="+8.2%" note="vs last month" icon="▱" />
+            <Metric label="Check-ins Today" value="382" delta="+15.6%" note="vs last month" icon="⌁" />
+            <Metric label="Class Attendance" value="92.4%" delta="-1.2%" note="vs last month" icon="▣" negative />
+          </div>
+
+          <div className="main-grid">
+            <div className="left-column">
+              <section className="panel chart-panel">
+                <div className="panel-heading"><h2>Membership Growth &amp; Acquisition</h2><div className="chart-controls"><button className="selected">YoY</button><button>Month</button></div></div>
+                <div className="chart"><div className="chart-grid"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span></div><svg viewBox="0 0 720 130" role="img" aria-label="Membership growth trend"><path d="M0 93 L65 84 L130 89 L195 83 L260 71 L325 57 L390 63 L455 50 L520 39 L585 29 L650 20 L720 10" fill="none" stroke="#c7fa00" strokeWidth="2" /></svg></div>
+              </section>
+              <div className="lower-grid">
+                <section className="panel checkins"><div className="panel-heading"><h2>Recent Member Check-ins</h2><button className="more" aria-label="More check-ins">•••</button></div><Member name="John Doe" type="VIP" time="08:54 AM" initials="JD" color="orange" /><Member name="Sarah Connor" type="Premium" time="08:11 AM" initials="SC" color="blue" /><Member name="James Smith" type="Basic" time="08:06 AM" initials="JS" color="red" /></section>
+                <section className="panel utilization"><div className="panel-heading"><h2>Trainer Utilization</h2><button className="more" aria-label="More trainer details">•••</button></div><div className="donut-wrap"><div className="donut"><strong>75%</strong><span>Utilized</span></div><div className="legend"><span><i className="lime" />Personal Training <b>(45 hrs)</b></span><span><i className="blue" />Group Lead <b>(15 hrs)</b></span></div></div></section>
+              </div>
+            </div>
+            <section className="panel schedule"><div className="panel-heading"><h2>Today&apos;s Class Schedule</h2><button className="more" aria-label="More classes">•••</button></div><ClassItem title="HIIT Performance" time="09:00 - 10:00 AM" meta="Coach Marcus · Studio A" tag="10/12" color="red" /><ClassItem title="Power Boxing" time="11:30 - 12:30 PM" meta="Coach Victor · Combat Ring" tag="9/15" color="orange" /><ClassItem title="Ash­tanga Yoga" time="05:00 - 06:00 PM" meta="Elena Petrova · Mind & Body" tag="15/25" color="teal" /><ClassItem title="CrossFit WOD" time="07:00 - 08:00 PM" meta="Coach Marcus · Studio B" tag="22/22" color="lime" /></section>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
+}
+
+// ─── Shared sidebar ────────────────────────────────────────────────────────────
+
+const NAV_LINKS = [
+  { href: "/",         label: "Dashboard",         icon: "◉", key: "dashboard" },
+  { href: "/revenue",  label: "Revenue",            icon: "◒", key: "revenue"   },
+  { href: "/classes",  label: "Classes & Timetable",icon: "▣", key: "classes"   },
+  { href: "/trainers", label: "Trainer Roster",     icon: "♙", key: "trainers"  },
+  { href: "/billing",  label: "Billing & Payments", icon: "▤", key: "billing"   },
+];
+
+export function Sidebar({ active }: { active: string }) {
+  const router = useRouter();
+
+  function handleLogout() {
+    sessionStorage.removeItem("gritfit_user");
+    router.push("/login");
+  }
+
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <span className="brand-mark">✦</span>
+        <span>GRITFIT<small>FITNESS CENTER</small></span>
+      </div>
+
+      <nav className="nav-list" aria-label="Main navigation">
+        {NAV_LINKS.map(l => (
+          <a key={l.key} className={`nav-item${active === l.key ? " active" : ""}`} href={l.href}>
+            <span>{l.icon}</span>{l.label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="profile">
+        <div className="avatar avatar-lime">LB</div>
+        <div><strong>Lance Bolo</strong><small>Club Manager</small></div>
+        <button
+          onClick={handleLogout}
+          aria-label="Log out"
+          title="Log out"
+          style={{
+            marginLeft: "auto",
+            background: "transparent",
+            border: "1px solid #2d3033",
+            borderRadius: 4,
+            color: "#7f8388",
+            cursor: "pointer",
+            fontSize: 9,
+            padding: "4px 7px",
+            lineHeight: 1,
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.color = "#e36464";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "#e36464";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.color = "#7f8388";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "#2d3033";
+          }}
+        >
+          ⏻
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+// ─── Small components ──────────────────────────────────────────────────────────
+
+function Metric({ label, value, delta, note, icon, negative = false }: { label: string; value: string; delta: string; note: string; icon: string; negative?: boolean }) {
+  return <article className="metric"><div className="metric-top"><span>{label}</span><b>{icon}</b></div><strong>{value}</strong><p className={negative ? "negative" : ""}>{delta} <em>{note}</em></p></article>;
+}
+
+function Member({ name, type, time, initials, color }: { name: string; type: string; time: string; initials: string; color: string }) {
+  return <div className="member"><div className={`avatar avatar-${color}`}>{initials}</div><div><strong>{name}</strong><small>{type}</small></div><time>{time}</time></div>;
+}
+
+function ClassItem({ title, time, meta, tag, color }: { title: string; time: string; meta: string; tag: string; color: string }) {
+  return <div className="class-item"><div className={`class-line ${color}`} /><div><strong>{title}</strong><small>{time}</small><small>{meta}</small></div><span>{tag}</span></div>;
 }
