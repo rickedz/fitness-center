@@ -96,8 +96,12 @@ export interface Checkin {
 }
 
 // View types
-export interface SessionEnrollment extends ClassSession {
+export interface SessionEnrollment {
+  session_id:   string;
   class_id:     string;
+  starts_at:    string;
+  ends_at:      string;
+  cancelled:    boolean;
   title:        string;
   room:         string;
   color:        string;
@@ -121,48 +125,48 @@ export type Database = {
     Tables: {
       profiles: {
         Row:    Profile;
-        Insert: Omit<Profile, "created_at" | "updated_at">;
-        Update: Partial<Omit<Profile, "id" | "created_at">>;
+        Insert: Partial<Profile>;
+        Update: Partial<Profile>;
       };
       memberships: {
         Row:    Membership;
-        Insert: Omit<Membership, "id" | "created_at" | "updated_at">;
-        Update: Partial<Omit<Membership, "id" | "created_at">>;
+        Insert: Partial<Membership>;
+        Update: Partial<Membership>;
       };
       trainers: {
         Row:    Trainer;
-        Insert: Omit<Trainer, "created_at" | "updated_at">;
-        Update: Partial<Omit<Trainer, "id" | "created_at">>;
+        Insert: Partial<Trainer>;
+        Update: Partial<Trainer>;
       };
       classes: {
         Row:    Class;
-        Insert: Omit<Class, "id" | "created_at" | "updated_at">;
-        Update: Partial<Omit<Class, "id" | "created_at">>;
+        Insert: Partial<Class>;
+        Update: Partial<Class>;
       };
       class_sessions: {
         Row:    ClassSession;
-        Insert: Omit<ClassSession, "id" | "created_at" | "updated_at">;
-        Update: Partial<Omit<ClassSession, "id" | "created_at">>;
+        Insert: Partial<ClassSession>;
+        Update: Partial<ClassSession>;
       };
       bookings: {
         Row:    Booking;
-        Insert: Omit<Booking, "id" | "booked_at" | "updated_at">;
-        Update: Partial<Omit<Booking, "id" | "booked_at">>;
+        Insert: Partial<Booking>;
+        Update: Partial<Booking>;
       };
       invoices: {
         Row:    Invoice;
-        Insert: Omit<Invoice, "id" | "created_at" | "updated_at">;
-        Update: Partial<Omit<Invoice, "id" | "created_at">>;
+        Insert: Partial<Invoice>;
+        Update: Partial<Invoice>;
       };
       checkins: {
         Row:    Checkin;
-        Insert: Omit<Checkin, "id">;
-        Update: Partial<Omit<Checkin, "id">>;
+        Insert: Partial<Checkin>;
+        Update: Partial<Checkin>;
       };
     };
     Views: {
-      session_enrollment: { Row: SessionEnrollment };
-      client_revenue:     { Row: ClientRevenue };
+      session_enrollment: { Row: SessionEnrollment; };
+      client_revenue:     { Row: ClientRevenue; };
     };
     Functions: {
       current_user_role:  { Returns: Role };
