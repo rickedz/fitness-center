@@ -1,35 +1,184 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { getSessionUser, ROLE_COOKIE, SESSION_KEY, clearSessionUser, type Role, type SessionUser } from "@/app/lib/auth";
+import { createClient } from "@/app/lib/supabase/client";
+import type { Profile, SessionEnrollment, Checkin } from "@/app/lib/supabase/types";
+
+type CheckinWithProfile = Checkin & { profiles: Pick<Profile, "full_name" | "avatar_color" | "avatar_initials"> };
 
 export default function Home() {
+  const router = useRouter();
+  const [sessions, setSessions]   = useState<SessionEnrollment[]>([]);
+  const [checkins, setCheckins]   = useState<CheckinWithProfile[]>([]);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [revenue, setRevenue]     = useState<number | null>(null);
+  const [loading, setLoading]     = useState(true);
+
+  useEffect(() => {
+    const u = getSessionUser();
+    if (!u || u.role !== "admin") { router.push("/login"); }
+  }, [router]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const todayEnd   = new Date(); todayEnd.setHours(23,59,59,999);
+
+    const [sesRes, checkinRes, memberRes, revenueRes] = await Promise.all([
+      supabase.from("session_enrollment").select("*").gte("starts_at", todayStart.toISOString()).lte("starts_at", todayEnd.toISOString()).order("starts_at"),
+      supabase.from("checkins").select("*, profiles(full_name, avatar_color, avatar_initials)").gte("checked_in_at", todayStart.toISOString()).order("checked_in_at", { ascending: false }).limit(6),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "client"),
+      supabase.from("invoices").select("amount_cents").eq("status", "paid"),
+    ]);
+
+    if (sesRes.data)     setSessions(sesRes.data as SessionEnrollment[]);
+    if (checkinRes.data) setCheckins(checkinRes.data as CheckinWithProfile[]);
+    if (memberRes.count !== null) setMemberCount(memberRes.count);
+    if (revenueRes.data) setRevenue(revenueRes.data.reduce((s, i) => s + i.amount_cents, 0));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const fmt = (cents: number) => "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 });
+  const avgAttendance = sessions.length > 0
+    ? Math.round(sessions.reduce((s, ses) => s + (ses.capacity > 0 ? Number(ses.enrolled) / ses.capacity : 0), 0) / sessions.length * 100)
+    : 0;
+
   return (
     <main className="dashboard-shell">
       <Sidebar active="dashboard" />
-
-      <section className="content" id="overview">
-        <header className="topbar"><h1>Executive Dashboard</h1><div className="top-actions"><label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search members, classes..." /></label><button className="status">● System Active</button><button className="icon-button" aria-label="Notifications">♧</button></div></header>
+      <section className="content">
+        <header className="topbar">
+          <h1>Executive Dashboard</h1>
+          <div className="top-actions">
+            <label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search members, classes…" /></label>
+            <button className="status">System Active</button>
+            <button className="icon-button" aria-label="Notifications">🔔</button>
+          </div>
+        </header>
 
         <div className="page-body">
           <div className="metrics">
-            <Metric label="Active Members" value="2,481" delta="+12.4%" note="vs last month" icon="♟" />
-            <Metric label="Monthly Revenue" value="$48,290" delta="+8.2%" note="vs last month" icon="▱" />
-            <Metric label="Check-ins Today" value="382" delta="+15.6%" note="vs last month" icon="⌁" />
-            <Metric label="Class Attendance" value="92.4%" delta="-1.2%" note="vs last month" icon="▣" negative />
+            <Metric label="Active Members"   value={loading ? "—" : String(memberCount ?? 0)} delta="clients"    note="on record"     icon="♟" up />
+            <Metric label="Total Revenue"    value={loading ? "—" : fmt(revenue ?? 0)}        delta="collected"  note="all paid"      icon="▱" up />
+            <Metric label="Check-ins Today"  value={loading ? "—" : String(checkins.length)}  delta="today"      note="recorded"      icon="⌁" up />
+            <Metric label="Class Attendance" value={loading ? "—" : `${avgAttendance}%`}      delta="fill rate"  note="today's avg"   icon="▣" />
           </div>
 
-          <div className="main-grid">
-            <div className="left-column">
-              <section className="panel chart-panel">
-                <div className="panel-heading"><h2>Membership Growth &amp; Acquisition</h2><div className="chart-controls"><button className="selected">YoY</button><button>Month</button></div></div>
-                <div className="chart"><div className="chart-grid"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span></div><svg viewBox="0 0 720 130" role="img" aria-label="Membership growth trend"><path d="M0 93 L65 84 L130 89 L195 83 L260 71 L325 57 L390 63 L455 50 L520 39 L585 29 L650 20 L720 10" fill="none" stroke="#c7fa00" strokeWidth="2" /></svg></div>
-              </section>
-              <div className="lower-grid">
-                <section className="panel checkins"><div className="panel-heading"><h2>Recent Member Check-ins</h2><button className="more" aria-label="More check-ins">•••</button></div><Member name="John Doe" type="VIP" time="08:54 AM" initials="JD" color="orange" /><Member name="Sarah Connor" type="Premium" time="08:11 AM" initials="SC" color="blue" /><Member name="James Smith" type="Basic" time="08:06 AM" initials="JS" color="red" /></section>
-                <section className="panel utilization"><div className="panel-heading"><h2>Trainer Utilization</h2><button className="more" aria-label="More trainer details">•••</button></div><div className="donut-wrap"><div className="donut"><strong>75%</strong><span>Utilized</span></div><div className="legend"><span><i className="lime" />Personal Training <b>(45 hrs)</b></span><span><i className="blue" />Group Lead <b>(15 hrs)</b></span></div></div></section>
+          <div className="two-col-7030">
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              <div className="panel">
+                <div className="panel-heading">
+                  <h2>Membership Growth &amp; Acquisition</h2>
+                  <div className="chart-controls">
+                    <button className="selected">YoY</button><button>Month</button><button>Week</button>
+                  </div>
+                </div>
+                <div className="chart-area">
+                  <svg viewBox="0 0 720 110" aria-label="Membership growth trend">
+                    <defs>
+                      <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#c7fa00" stopOpacity=".18" />
+                        <stop offset="100%" stopColor="#c7fa00" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    {[20,45,70,95].map(y=><line key={y} x1="0" y1={y} x2="720" y2={y} stroke="#1a1d21" strokeWidth="1"/>)}
+                    <path d="M0 93 L60 87 L120 90 L180 82 L240 74 L300 61 L360 66 L420 53 L480 42 L540 32 L600 22 L660 14 L720 8" fill="url(#lg)" stroke="none"/>
+                    <path d="M0 93 L60 87 L120 90 L180 82 L240 74 L300 61 L360 66 L420 53 L480 42 L540 32 L600 22 L660 14 L720 8" fill="none" stroke="#c7fa00" strokeWidth="2" strokeLinejoin="round"/>
+                    {([[0,93],[60,87],[120,90],[180,82],[240,74],[300,61],[360,66],[420,53],[480,42],[540,32],[600,22],[660,14],[720,8]] as [number,number][]).map(([x,y],i)=>(
+                      <circle key={i} cx={x} cy={y} r="3" fill="#c7fa00" opacity=".7"/>
+                    ))}
+                  </svg>
+                </div>
+                <div className="chart-months">
+                  {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map(m=><span key={m}>{m}</span>)}
+                </div>
+              </div>
+
+              <div className="two-col">
+                {/* Recent check-ins */}
+                <div className="panel">
+                  <div className="panel-heading"><h2>Recent Check-ins</h2><button className="view-all">View all</button></div>
+                  {loading
+                    ? <div style={{ padding: "24px 14px", textAlign: "center", color: "#505660", fontSize: 9 }}>Loading…</div>
+                    : checkins.length === 0
+                    ? <div style={{ padding: "32px 14px", textAlign: "center", color: "#3a3e44", fontSize: 9 }}>No check-ins today</div>
+                    : (
+                    <div className="member-list">
+                      {checkins.map(c => (
+                        <div key={c.id} className="member">
+                          <div className={`avatar avatar-${c.profiles?.avatar_color ?? "lime"}`}>{c.profiles?.avatar_initials ?? "?"}</div>
+                          <div>
+                            <strong>{c.profiles?.full_name ?? "—"}</strong>
+                            <small><span className="member-badge badge-basic">{c.session_id ? "class" : "walk-in"}</span></small>
+                          </div>
+                          <time>{new Date(c.checked_in_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</time>
+                        </div>
+                      ))}
+                    </div>
+                    )}
+                </div>
+
+                {/* Trainer utilization (static) */}
+                <div className="panel">
+                  <div className="panel-heading"><h2>Trainer Utilization</h2><button className="more">•••</button></div>
+                  <div className="donut-section">
+                    <div className="donut"><strong>75%</strong><span>Used</span></div>
+                    <div className="donut-legend">
+                      <span><i className="i i-lime"/>PT Sessions<b> (45 hrs)</b></span>
+                      <span><i className="i i-blue"/>Group Classes<b> (15 hrs)</b></span>
+                      <span><i className="i i-orange"/>Consultations<b> (6 hrs)</b></span>
+                    </div>
+                  </div>
+                  <div className="prog-row"><div className="prog-labels"><span>Coach Marcus</span><small>82%</small></div><div className="prog-track"><div className="prog-fill" style={{width:"82%",background:"#c7fa00"}}/></div></div>
+                  <div className="prog-row"><div className="prog-labels"><span>Coach Victor</span><small>70%</small></div><div className="prog-track"><div className="prog-fill" style={{width:"70%",background:"#507be2"}}/></div></div>
+                  <div className="prog-row"><div className="prog-labels"><span>Elena Petrova</span><small>68%</small></div><div className="prog-track"><div className="prog-fill" style={{width:"68%",background:"#00c9a7"}}/></div></div>
+                </div>
               </div>
             </div>
-            <section className="panel schedule"><div className="panel-heading"><h2>Today&apos;s Class Schedule</h2><button className="more" aria-label="More classes">•••</button></div><ClassItem title="HIIT Performance" time="09:00 - 10:00 AM" meta="Coach Marcus · Studio A" tag="10/12" color="red" /><ClassItem title="Power Boxing" time="11:30 - 12:30 PM" meta="Coach Victor · Combat Ring" tag="9/15" color="orange" /><ClassItem title="Ash­tanga Yoga" time="05:00 - 06:00 PM" meta="Elena Petrova · Mind & Body" tag="15/25" color="teal" /><ClassItem title="CrossFit WOD" time="07:00 - 08:00 PM" meta="Coach Marcus · Studio B" tag="22/22" color="lime" /></section>
+
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              {/* Today's schedule */}
+              <div className="panel">
+                <div className="panel-heading"><h2>Today's Schedule</h2><button className="view-all">View all</button></div>
+                {loading
+                  ? <div style={{ padding: "24px 14px", textAlign: "center", color: "#505660", fontSize: 9 }}>Loading…</div>
+                  : sessions.length === 0
+                  ? <div style={{ padding: "32px 14px", textAlign: "center", color: "#3a3e44", fontSize: 9 }}>No classes today</div>
+                  : (
+                  <div className="class-list">
+                    {sessions.map(s => {
+                      const startDate = new Date(s.starts_at);
+                      const endDate   = new Date(s.ends_at);
+                      const timeLabel = startDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) + "–" +
+                        endDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                      return (
+                        <div key={s.session_id} className="class-item">
+                          <div className={`class-line ${s.color}`}/>
+                          <div><strong>{s.title}</strong><small>{timeLabel}</small><small>{s.trainer_name ?? "—"} · {s.room}</small></div>
+                          <span className="class-tag">{s.enrolled}/{s.capacity}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  )}
+              </div>
+
+              {/* Quick stats */}
+              <div className="panel">
+                <div className="panel-heading"><h2>Quick Stats</h2></div>
+                <div className="stat-row"><span className="label">Client Members</span><span className="val lime">{memberCount ?? "—"}</span></div>
+                <div className="stat-row"><span className="label">Total Revenue</span><span className="val lime">{revenue !== null ? fmt(revenue) : "—"}</span></div>
+                <div className="stat-row"><span className="label">Check-ins Today</span><span className="val">{checkins.length}</span></div>
+                <div className="stat-row"><span className="label">Classes Today</span><span className="val">{sessions.length}</span></div>
+                <div className="stat-row"><span className="label">Avg. Fill Rate</span><span className="val lime">{avgAttendance}%</span></div>
+                <div className="stat-row"><span className="label">Fully Booked</span><span className="val orange">{sessions.filter(s=>Number(s.enrolled)>=s.capacity).length}</span></div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -37,23 +186,49 @@ export default function Home() {
   );
 }
 
-// ─── Shared sidebar ────────────────────────────────────────────────────────────
+// ── Role-aware nav config ─────────────────────────────────────────────────────
 
-const NAV_LINKS = [
-  { href: "/",         label: "Dashboard",         icon: "◉", key: "dashboard" },
-  { href: "/revenue",  label: "Revenue",            icon: "◒", key: "revenue"   },
-  { href: "/classes",  label: "Classes & Timetable",icon: "▣", key: "classes"   },
-  { href: "/trainers", label: "Trainer Roster",     icon: "♙", key: "trainers"  },
-  { href: "/billing",  label: "Billing & Payments", icon: "▤", key: "billing"   },
-];
+const NAV_BY_ROLE: Record<Role, { href:string; label:string; icon:string; key:string }[]> = {
+  admin: [
+    { href:"/",            label:"Dashboard",          icon:"◉", key:"dashboard"  },
+    { href:"/revenue",     label:"Revenue",            icon:"◒", key:"revenue"    },
+    { href:"/classes",     label:"Classes & Timetable",icon:"▣", key:"classes"    },
+    { href:"/trainers",    label:"Trainer Roster",     icon:"♙", key:"trainers"   },
+    { href:"/billing",     label:"Billing & Payments", icon:"▤", key:"billing"    },
+    { href:"/admin/users", label:"User Management",    icon:"⊞", key:"users"      },
+  ],
+  staff: [
+    { href:"/staff",    label:"My Dashboard",       icon:"◉", key:"staff"    },
+    { href:"/classes",  label:"Classes & Timetable",icon:"▣", key:"classes"  },
+    { href:"/trainers", label:"Trainer Roster",     icon:"♙", key:"trainers" },
+  ],
+  client: [
+    { href:"/client", label:"My Dashboard", icon:"◉", key:"client" },
+  ],
+};
+
+const ROLE_LABEL: Record<Role, string> = { admin:"Admin", staff:"Staff", client:"Client" };
+const ROLE_COLOR: Record<Role, string> = { admin:"#c7fa00", staff:"#ffad3c", client:"#7fa4f0" };
+const ROLE_BG:    Record<Role, string> = {
+  admin:"rgba(199,250,0,.1)", staff:"rgba(255,173,60,.1)", client:"rgba(127,164,240,.1)",
+};
+
+// ── Shared Sidebar ─────────────────────────────────────────────────────────────
 
 export function Sidebar({ active }: { active: string }) {
   const router = useRouter();
+  const [user, setUser] = useState<SessionUser | null>(null);
 
-  function handleLogout() {
-    // Clear auth cookie so proxy redirects to login on next visit
-    document.cookie = "gritfit_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    sessionStorage.removeItem("gritfit_user");
+  useEffect(() => { setUser(getSessionUser()); }, []);
+
+  const role: Role = user?.role ?? "client";
+  const links = NAV_BY_ROLE[role];
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    document.cookie = `${ROLE_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    clearSessionUser();
     router.push("/login");
   }
 
@@ -64,58 +239,50 @@ export function Sidebar({ active }: { active: string }) {
         <span>GRITFIT<small>FITNESS CENTER</small></span>
       </div>
 
+      {user && (
+        <div style={{ margin:"-18px 3px 20px", display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{
+            fontSize:7, fontWeight:700, letterSpacing:".1em", textTransform:"uppercase",
+            padding:"3px 8px", borderRadius:10,
+            background: ROLE_BG[role], color: ROLE_COLOR[role],
+            border:`1px solid ${ROLE_COLOR[role]}30`,
+          }}>
+            {ROLE_LABEL[role]}
+          </span>
+        </div>
+      )}
+
       <nav className="nav-list" aria-label="Main navigation">
-        {NAV_LINKS.map(l => (
-          <a key={l.key} className={`nav-item${active === l.key ? " active" : ""}`} href={l.href}>
-            <span>{l.icon}</span>{l.label}
+        {links.map(l => (
+          <a key={l.key} className={`nav-item${active === l.key ? " active" : ""}`} href={l.href}
+            aria-current={active === l.key ? "page" : undefined}>
+            <span className="nav-icon">{l.icon}</span>{l.label}
           </a>
         ))}
       </nav>
 
       <div className="profile">
-        <div className="avatar avatar-lime">LB</div>
-        <div><strong>Lance Bolo</strong><small>Club Manager</small></div>
-        <button
-          onClick={handleLogout}
-          aria-label="Log out"
-          title="Log out"
-          style={{
-            marginLeft: "auto",
-            background: "transparent",
-            border: "1px solid #2d3033",
-            borderRadius: 4,
-            color: "#7f8388",
-            cursor: "pointer",
-            fontSize: 9,
-            padding: "4px 7px",
-            lineHeight: 1,
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.color = "#e36464";
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "#e36464";
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.color = "#7f8388";
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "#2d3033";
-          }}
-        >
-          ⏻
-        </button>
+        <div className={`avatar avatar-${user?.avatarColor ?? "lime"}`}>
+          {user?.avatar ?? "?"}
+        </div>
+        <div>
+          <strong>{user?.name ?? "…"}</strong>
+          <small>{user?.title ?? ""}</small>
+        </div>
+        <button className="logout-btn" onClick={handleLogout} aria-label="Log out" title="Log out">⏻</button>
       </div>
     </aside>
   );
 }
 
-// ─── Small components ──────────────────────────────────────────────────────────
+// ── Small components ──────────────────────────────────────────────────────────
 
-function Metric({ label, value, delta, note, icon, negative = false }: { label: string; value: string; delta: string; note: string; icon: string; negative?: boolean }) {
-  return <article className="metric"><div className="metric-top"><span>{label}</span><b>{icon}</b></div><strong>{value}</strong><p className={negative ? "negative" : ""}>{delta} <em>{note}</em></p></article>;
-}
-
-function Member({ name, type, time, initials, color }: { name: string; type: string; time: string; initials: string; color: string }) {
-  return <div className="member"><div className={`avatar avatar-${color}`}>{initials}</div><div><strong>{name}</strong><small>{type}</small></div><time>{time}</time></div>;
-}
-
-function ClassItem({ title, time, meta, tag, color }: { title: string; time: string; meta: string; tag: string; color: string }) {
-  return <div className="class-item"><div className={`class-line ${color}`} /><div><strong>{title}</strong><small>{time}</small><small>{meta}</small></div><span>{tag}</span></div>;
+function Metric({ label,value,delta,note,icon,up=false }:{ label:string;value:string;delta:string;note:string;icon:string;up?:boolean }) {
+  return (
+    <article className="metric">
+      <div className="metric-top"><span>{label}</span><span className="metric-icon">{icon}</span></div>
+      <strong>{value}</strong>
+      <p className="metric-delta"><span className={up?"up":"down"}>{delta}</span><em>{note}</em></p>
+    </article>
+  );
 }

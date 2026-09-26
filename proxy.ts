@@ -1,30 +1,63 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import {
+  ALL_PROTECTED,
+  AUTH_ROUTES,
+  ROLE_ROUTES,
+  ROLE_COOKIE,
+  homeForRole,
+  type Role,
+} from "@/app/lib/auth";
 
-// Protected routes — require auth cookie
-const PROTECTED = ["/", "/revenue", "/classes", "/trainers", "/billing"];
+export async function proxy(request: NextRequest) {
+  let response = NextResponse.next({ request });
 
-// Auth routes — redirect to dashboard if already logged in
-const AUTH_ROUTES = ["/login", "/signup"];
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
 
-export function proxy(request: NextRequest) {
+  const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
-  const isLoggedIn = request.cookies.has("gritfit_session");
+  const role = request.cookies.get(ROLE_COOKIE)?.value as Role | undefined;
 
-  // Redirect logged-in users away from login/signup
-  if (AUTH_ROUTES.includes(pathname) && isLoggedIn) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // Logged-in users visiting auth pages → redirect to their home
+  if (AUTH_ROUTES.includes(pathname) && user && role) {
+    return NextResponse.redirect(new URL(homeForRole(role), request.url));
   }
 
-  // Redirect unauthenticated users to login
-  if (PROTECTED.includes(pathname) && !isLoggedIn) {
-    const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
+  // Unauthenticated users visiting protected pages → login
+  if (ALL_PROTECTED.includes(pathname) && !user) {
+    const url = new URL("/login", request.url);
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  // Authenticated users visiting a page outside their role's allowed routes
+  if (ALL_PROTECTED.includes(pathname) && user && role) {
+    const allowed = ROLE_ROUTES[role] ?? [];
+    if (!allowed.includes(pathname)) {
+      return NextResponse.redirect(new URL(homeForRole(role), request.url));
+    }
+  }
+
+  return response;
 }
 
 export const config = {
-  matcher: ["/", "/revenue", "/classes", "/trainers", "/billing", "/login", "/signup"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
