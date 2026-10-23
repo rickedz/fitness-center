@@ -5,8 +5,10 @@
 
 -- ── 1. Enums ──────────────────────────────────────────────────────────────────
 do $$ begin
-  create type public.user_role as enum ('admin', 'staff', 'client');
+  create type public.user_role as enum ('admin', 'staff', 'trainer', 'client');
 exception when duplicate_object then null; end $$;
+
+alter type public.user_role add value if not exists 'trainer';
 
 do $$ begin
   create type public.membership_plan as enum ('basic', 'premium', 'vip');

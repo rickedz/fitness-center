@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { NextRequest } from "next/server";
-import { middleware } from "../middleware";
+import { applyRouting as middleware } from "../app/lib/routing";
 import { ROLE_COOKIE } from "../app/lib/auth";
 
 function makeRequest(pathname: string, role?: string) {

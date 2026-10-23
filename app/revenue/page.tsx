@@ -80,7 +80,7 @@ export default function RevenuePage() {
     <main className="dashboard-shell">
       <Sidebar active="revenue" />
       <section className="content">
-          <Topbar title="Revenue" searchPlaceholder="Search transactions…" />
+          <Topbar title="Revenue" />
 
         <div className="page-body">
           <div className="metrics">

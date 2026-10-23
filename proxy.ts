@@ -1,18 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import {
-  ALL_PROTECTED,
-  AUTH_ROUTES,
-  ROLE_ROUTES,
-  ROLE_COOKIE,
-  homeForRole,
-  type Role,
-} from "@/app/lib/auth";
+import { ROLE_COOKIE } from "@/app/lib/auth";
+import { applyRouting } from "@/app/lib/routing";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createServerClient<any>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -31,30 +25,8 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const { pathname } = request.nextUrl;
-  const role = request.cookies.get(ROLE_COOKIE)?.value as Role | undefined;
 
-  // Logged-in users visiting auth pages → redirect to their home
-  if (AUTH_ROUTES.includes(pathname) && user && role) {
-    return NextResponse.redirect(new URL(homeForRole(role), request.url));
-  }
-
-  // Unauthenticated users visiting protected pages → login
-  if (ALL_PROTECTED.includes(pathname) && !user) {
-    const url = new URL("/login", request.url);
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  // Authenticated users visiting a page outside their role's allowed routes
-  if (ALL_PROTECTED.includes(pathname) && user && role) {
-    const allowed = ROLE_ROUTES[role] ?? [];
-    if (!allowed.includes(pathname)) {
-      return NextResponse.redirect(new URL(homeForRole(role), request.url));
-    }
-  }
-
-  return response;
+  return applyRouting(request, user);
 }
 
 export const config = {

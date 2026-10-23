@@ -5,7 +5,7 @@ import { Sidebar, Topbar } from "@/app/page";
 import { createClient } from "@/app/lib/supabase/client";
 import type { Trainer, Profile, SessionEnrollment } from "@/app/lib/supabase/types";
 
-type TrainerRow = Trainer & { profiles: Pick<Profile, "full_name" | "avatar_color" | "avatar_initials"> };
+type TrainerRow = Partial<Trainer> & Pick<Profile, "id" | "full_name" | "avatar_color" | "avatar_initials">;
 
 const COLOR_HEX: Record<string, string> = {
   lime: "#c7fa00", orange: "#ffad3c", red: "#ee4b65",
@@ -34,12 +34,16 @@ export default function TrainersPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-    const [trainerRes, sesRes] = await Promise.all([
-      supabase.from("trainers").select("*, profiles(full_name, avatar_color, avatar_initials)"),
+    const [profileRes, trainerRes, sesRes] = await Promise.all([
+      supabase.from("profiles").select("id, full_name, avatar_color, avatar_initials").eq("role", "trainer"),
+      supabase.from("trainers").select("*"),
       supabase.from("session_enrollment").select("*").gte("starts_at", new Date().toISOString()).order("starts_at", { ascending: true }).limit(20),
     ]);
-    if (trainerRes.data) setTrainers(trainerRes.data as TrainerRow[]);
-    if (sesRes.data)     setSessions(sesRes.data as SessionEnrollment[]);
+    if (profileRes.data) {
+      const trainerMap = new Map((trainerRes.data ?? []).map((t: Trainer) => [t.id, t]));
+      setTrainers(profileRes.data.map(p => ({ ...trainerMap.get(p.id), ...p })) as TrainerRow[]);
+    }
+    if (sesRes.data) setSessions(sesRes.data as SessionEnrollment[]);
     setLoading(false);
   }, []);
 
@@ -55,7 +59,7 @@ export default function TrainersPage() {
     <main className="dashboard-shell">
       <Sidebar active="trainers" />
       <section className="content">
-          <Topbar title="Trainer Roster" searchPlaceholder="Search trainers…" />
+          <Topbar title="Trainer Roster" />
 
         <div className="page-body">
           <div className="metrics">
@@ -83,16 +87,16 @@ export default function TrainersPage() {
                   </thead>
                   <tbody>
                     {trainers.map(t => {
-                      const color = COLOR_HEX[t.profiles?.avatar_color ?? "lime"] ?? "#c7fa00";
-                      const trainerSessions = sessions.filter(s => s.trainer_name === t.profiles?.full_name);
+                      const color = COLOR_HEX[t.avatar_color ?? "lime"] ?? "#c7fa00";
+                      const trainerSessions = sessions.filter(s => s.trainer_name === t.full_name);
                       return (
                         <tr key={t.id}>
                           <td>
                             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                              <div className={`avatar avatar-${t.profiles?.avatar_color ?? "lime"}`} style={{ fontSize: 8 }}>
-                                {t.profiles?.avatar_initials ?? "?"}
+                              <div className={`avatar avatar-${t.avatar_color ?? "lime"}`} style={{ fontSize: 8 }}>
+                                {t.avatar_initials ?? "?"}
                               </div>
-                              <strong style={{ fontSize: 10 }}>{t.profiles?.full_name ?? "—"}</strong>
+                              <strong style={{ fontSize: 10 }}>{t.full_name ?? "—"}</strong>
                             </div>
                           </td>
                           <td className="td-muted">{t.specialty}</td>
@@ -159,7 +163,7 @@ export default function TrainersPage() {
                   const top = [...trainers].sort((a, b) => Number(b.rating) - Number(a.rating))[0];
                   return (
                     <>
-                      <div className="stat-row"><span className="label">Highest Rated</span><span className="val lime">{top.profiles?.full_name} · ★ {top.rating}</span></div>
+                      <div className="stat-row"><span className="label">Highest Rated</span><span className="val lime">{top.full_name} · ★ {top.rating ?? "—"}</span></div>
                       <div className="stat-row"><span className="label">Active Trainers</span><span className="val">{trainers.filter(t=>t.status==="active").length}</span></div>
                       <div className="stat-row"><span className="label">Part-time</span><span className="val">{trainers.filter(t=>t.status==="part-time").length}</span></div>
                       <div className="stat-row"><span className="label">Sessions Today</span><span className="val lime">{todaySessions.length}</span></div>

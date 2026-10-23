@@ -6,11 +6,12 @@ import { Sidebar } from "@/app/page";
 import { createClient } from "@/app/lib/supabase/client";
 import { getSessionUser, type Profile, type Role } from "@/app/lib/auth";
 
-const ROLE_COLOR: Record<Role, string> = { admin: "#c7fa00", staff: "#ffad3c", client: "#7fa4f0" };
+const ROLE_COLOR: Record<Role, string> = { admin: "#c7fa00", staff: "#ffad3c", trainer: "#00c9a7", client: "#7fa4f0" };
 const ROLE_BG:    Record<Role, string> = {
-  admin:  "rgba(199,250,0,.1)",
-  staff:  "rgba(255,173,60,.1)",
-  client: "rgba(127,164,240,.1)",
+  admin:   "rgba(199,250,0,.1)",
+  staff:   "rgba(255,173,60,.1)",
+  trainer: "rgba(0,201,167,.1)",
+  client:  "rgba(127,164,240,.1)",
 };
 
 type FilterRole = Role | "all";
@@ -52,18 +53,14 @@ export default function AdminUsersPage() {
   useEffect(() => { if (ready) fetchProfiles(); }, [ready, fetchProfiles]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const filtered = profiles.filter(p => {
-    const matchRole   = filter === "all" || p.role === filter;
-    const matchSearch = !search ||
-      p.full_name.toLowerCase().includes(search.toLowerCase());
-    return matchRole && matchSearch;
-  });
+  const filtered = profiles.filter(p => filter === "all" || p.role === filter);
 
   const counts = {
-    all:    profiles.length,
-    admin:  profiles.filter(p => p.role === "admin").length,
-    staff:  profiles.filter(p => p.role === "staff").length,
-    client: profiles.filter(p => p.role === "client").length,
+    all:     profiles.length,
+    admin:   profiles.filter(p => p.role === "admin").length,
+    staff:   profiles.filter(p => p.role === "staff").length,
+    trainer: profiles.filter(p => p.role === "trainer").length,
+    client:  profiles.filter(p => p.role === "client").length,
   };
 
   // ── Role change ─────────────────────────────────────────────────────────────
@@ -128,11 +125,6 @@ export default function AdminUsersPage() {
         <header className="topbar">
           <h1>User Management</h1>
           <div className="top-actions">
-            <input
-              aria-label="Search users" placeholder="Search by name…"
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{ height: 30, background: "#111416", border: "1px solid var(--line)", borderRadius: 6, color: "#ccc", fontSize: 10, padding: "0 12px", outline: "none", width: 200 }}
-            />
             <button onClick={() => setShowAdd(v => !v)} style={{
               height: 30, background: "rgba(199,250,0,.1)", border: "1px solid rgba(199,250,0,.25)",
               borderRadius: 6, color: "#c7fa00", fontSize: 9, fontWeight: 700, padding: "0 14px",
@@ -151,13 +143,13 @@ export default function AdminUsersPage() {
 
           {/* KPI tiles */}
           <div className="metrics">
-            {(["all", "admin", "staff", "client"] as FilterRole[]).map(r => (
+            {(["all", "admin", "staff", "trainer", "client"] as FilterRole[]).map(r => (
               <article key={r} className="metric" onClick={() => setFilter(r)}
                 style={{ cursor: "pointer", border: filter === r ? `1px solid ${r === "all" ? "#505660" : ROLE_COLOR[r as Role]}` : undefined }}>
                 <div className="metric-top">
                   <span style={{ textTransform: "capitalize" }}>{r === "all" ? "All Users" : r + "s"}</span>
                   <span className="metric-icon" style={{ color: r === "all" ? "#9da1a5" : ROLE_COLOR[r as Role] }}>
-                    {r === "all" ? "⊞" : r === "admin" ? "◉" : r === "staff" ? "♙" : "♟"}
+                    {r === "all" ? "⊞" : r === "admin" ? "◉" : r === "staff" ? "♙" : r === "trainer" ? "△" : "♟"}
                   </span>
                 </div>
                 <strong>{loading ? "—" : counts[r]}</strong>
@@ -195,6 +187,7 @@ export default function AdminUsersPage() {
                   <select value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value as Role }))}
                     style={{ width: "100%", height: 36, background: "#0d0f11", border: "1px solid var(--line)", borderRadius: 5, color: "#f2f3f1", fontSize: 10, padding: "0 10px", outline: "none" }}>
                     <option value="client">Client</option>
+                    <option value="trainer">Trainer</option>
                     <option value="staff">Staff</option>
                     <option value="admin">Admin</option>
                   </select>
@@ -222,7 +215,7 @@ export default function AdminUsersPage() {
                   </span>
                 </h2>
                 <div style={{ display: "flex", gap: 3 }}>
-                  {(["all", "admin", "staff", "client"] as FilterRole[]).map(r => (
+                  {(["all", "admin", "staff", "trainer", "client"] as FilterRole[]).map(r => (
                     <button key={r} onClick={() => setFilter(r)} style={{
                       fontSize: 8, fontWeight: 600, padding: "3px 8px", borderRadius: 4,
                       border: "1px solid transparent", cursor: "pointer", textTransform: "capitalize",
@@ -292,6 +285,7 @@ export default function AdminUsersPage() {
                   onClose={() => setSelected(null)}
                   onRoleChange={handleRoleChange}
                   onDelete={handleDelete}
+                  onRefresh={fetchProfiles}
                 />
               ) : (
                 <div className="panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 260, color: "#3a3e44", gap: 10 }}>
@@ -304,9 +298,10 @@ export default function AdminUsersPage() {
               <div className="panel">
                 <div className="panel-heading"><h2>Role Permissions</h2></div>
                 {([
-                  { role: "admin"  as Role, pages: ["Dashboard","Revenue","Classes","Trainers","Billing","User Management"], color: "#c7fa00" },
-                  { role: "staff"  as Role, pages: ["Staff Dashboard","Classes","Trainer Roster"],                           color: "#ffad3c" },
-                  { role: "client" as Role, pages: ["Client Dashboard (own data only)"],                                     color: "#7fa4f0" },
+                  { role: "admin"   as Role, pages: ["Dashboard","Revenue","Classes","Trainers","Billing","User Management"], color: "#c7fa00" },
+                  { role: "staff"   as Role, pages: ["Staff Dashboard","Classes","Trainer Roster"],                           color: "#ffad3c" },
+                  { role: "trainer" as Role, pages: ["Trainer Dashboard","Classes","Trainer Roster"],                        color: "#00c9a7" },
+                  { role: "client"  as Role, pages: ["Client Dashboard (own data only)"],                                    color: "#7fa4f0" },
                 ]).map(r => (
                   <div key={r.role} style={{ padding: "10px 14px", borderBottom: "1px solid var(--line)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -330,17 +325,70 @@ export default function AdminUsersPage() {
 
 // ── User detail / edit panel ──────────────────────────────────────────────────
 
-function UserDetail({ profile, saving, onClose, onRoleChange, onDelete }: {
+const PLAN_PRICES: Record<string, number> = { basic: 2900, premium: 4900, vip: 9900 };
+
+function UserDetail({ profile, saving, onClose, onRoleChange, onDelete, onRefresh }: {
   profile: Profile;
   saving: boolean;
   onClose: () => void;
   onRoleChange: (id: string, role: Role) => void;
   onDelete: (id: string) => void;
+  onRefresh: () => void;
 }) {
-  const [editRole, setEditRole] = useState<Role>(profile.role);
+  const [editRole, setEditRole]       = useState<Role>(profile.role);
+  const [membership, setMembership]   = useState<{ id: string; plan: string; status: string; expires_at: string | null } | null>(null);
+  const [plan, setPlan]               = useState<"basic" | "premium" | "vip">("basic");
+  const [expiresAt, setExpiresAt]     = useState("");
+  const [assigningSub, setAssigningSub] = useState(false);
+  const [subMsg, setSubMsg]           = useState("");
 
-  // Reset when profile changes
   useEffect(() => { setEditRole(profile.role); }, [profile.id, profile.role]);
+
+  useEffect(() => {
+    if (profile.role !== "client") { setMembership(null); return; }
+    createClient()
+      .from("memberships").select("id, plan, status, expires_at")
+      .eq("client_id", profile.id).eq("status", "active").maybeSingle()
+      .then(({ data }) => {
+        setMembership(data);
+        if (data) { setPlan(data.plan as "basic" | "premium" | "vip"); setExpiresAt(data.expires_at?.slice(0, 10) ?? ""); }
+      });
+  }, [profile.id, profile.role]);
+
+  async function handleAssignPlan() {
+    setAssigningSub(true);
+    setSubMsg("");
+    const supabase = createClient();
+    const payload = {
+      client_id:   profile.id,
+      plan,
+      status:      "active",
+      started_at:  new Date().toISOString().slice(0, 10),
+      expires_at:  expiresAt || null,
+      price_cents: PLAN_PRICES[plan],
+    };
+    let error;
+    if (membership) {
+      ({ error } = await supabase.from("memberships").update({ plan, expires_at: expiresAt || null, price_cents: PLAN_PRICES[plan] }).eq("id", membership.id));
+    } else {
+      ({ error } = await supabase.from("memberships").insert(payload));
+    }
+    if (error) { setSubMsg("Error: " + error.message); }
+    else {
+      setSubMsg(membership ? "Plan updated." : "Plan assigned.");
+      // also create an invoice
+      await supabase.from("invoices").insert({
+        client_id:   profile.id,
+        description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Membership`,
+        amount_cents: PLAN_PRICES[plan],
+        status:      "pending",
+        method:      "cash",
+        due_at:      new Date().toISOString().slice(0, 10),
+      });
+      onRefresh();
+    }
+    setAssigningSub(false);
+  }
 
   return (
     <div className="panel">
@@ -373,13 +421,53 @@ function UserDetail({ profile, saving, onClose, onRoleChange, onDelete }: {
         <span className="val">{new Date(profile.created_at).toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric" })}</span>
       </div>
 
+      {/* Assign subscription plan — clients only */}
+      {profile.role === "client" && (
+        <div style={{ padding: "12px 14px", borderTop: "1px solid var(--line)" }}>
+          <div style={{ fontSize: 8, color: "#9da1a5", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 10 }}>
+            {membership ? "Update Subscription Plan" : "Assign Subscription Plan"}
+          </div>
+          {membership && (
+            <div style={{ marginBottom: 10, fontSize: 9, color: "#505660" }}>
+              Current: <span style={{ color: "#c7fa00", fontWeight: 700, textTransform: "capitalize" }}>{membership.plan}</span>
+              {membership.expires_at && <> · Expires {new Date(membership.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            {(["basic", "premium", "vip"] as const).map(p => {
+              const colors: Record<string, string> = { basic: "#7fa4f0", premium: "#c7fa00", vip: "#ffad3c" };
+              const bgs:    Record<string, string> = { basic: "rgba(127,164,240,.1)", premium: "rgba(199,250,0,.1)", vip: "rgba(255,173,60,.1)" };
+              return (
+                <button key={p} onClick={() => setPlan(p)} style={{
+                  flex: 1, padding: "8px 4px", borderRadius: 5, fontSize: 9, fontWeight: 700, cursor: "pointer", textTransform: "capitalize",
+                  background: plan === p ? bgs[p] : "transparent",
+                  border: `1px solid ${plan === p ? colors[p] + "60" : "var(--line)"}`,
+                  color: plan === p ? colors[p] : "#505660",
+                }}>
+                  {p}<br />
+                  <span style={{ fontSize: 7, fontWeight: 400, opacity: .7 }}>${PLAN_PRICES[p] / 100}/mo</span>
+                </button>
+              );
+            })}
+          </div>
+          <label style={{ fontSize: 8, color: "#9da1a5", fontWeight: 600, display: "block", marginBottom: 5 }}>Expiry Date (optional)</label>
+          <input type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)}
+            style={{ width: "100%", height: 34, background: "#0d0f11", border: "1px solid var(--line)", borderRadius: 5, color: "#f2f3f1", fontSize: 10, padding: "0 10px", marginBottom: 10, outline: "none", colorScheme: "dark" }} />
+          {subMsg && <p style={{ fontSize: 9, color: subMsg.startsWith("Error") ? "#e36464" : "#00c9a7", margin: "0 0 8px" }}>{subMsg}</p>}
+          <button onClick={handleAssignPlan} disabled={assigningSub}
+            style={{ width: "100%", height: 34, borderRadius: 5, fontSize: 9, fontWeight: 700, cursor: assigningSub ? "not-allowed" : "pointer", background: "rgba(199,250,0,.1)", border: "1px solid rgba(199,250,0,.25)", color: "#c7fa00", textTransform: "uppercase", letterSpacing: ".04em", opacity: assigningSub ? .6 : 1 }}>
+            {assigningSub ? "Saving…" : membership ? "Update Plan" : "Assign Plan"}
+          </button>
+        </div>
+      )}
+
       {/* Role editor */}
       <div style={{ padding: "12px 14px", borderTop: "1px solid var(--line)" }}>
         <label style={{ fontSize: 8, color: "#9da1a5", fontWeight: 600, display: "block", marginBottom: 7, textTransform: "uppercase", letterSpacing: ".04em" }}>
           Change Role
         </label>
         <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-          {(["client", "staff", "admin"] as Role[]).map(r => (
+          {(["client", "trainer", "staff", "admin"] as Role[]).map(r => (
             <button key={r} onClick={() => setEditRole(r)} style={{
               flex: 1, padding: "7px 4px", borderRadius: 5, fontSize: 9, fontWeight: 600, cursor: "pointer", textTransform: "capitalize",
               background: editRole === r ? ROLE_BG[r] : "transparent",

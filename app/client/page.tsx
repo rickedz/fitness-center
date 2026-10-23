@@ -147,7 +147,7 @@ export default function ClientPage() {
     <main className="dashboard-shell">
       <Sidebar active="client" />
       <section className="content">
-          <Topbar title="My Dashboard" searchPlaceholder="Search classes…" />
+          <Topbar title="My Dashboard" />
 
         <div className="page-body">
 

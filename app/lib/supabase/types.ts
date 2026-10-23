@@ -1,7 +1,7 @@
 // Auto-generate the full type file with:
 //   npx supabase gen types typescript --project-id YOUR_PROJECT_ID > app/lib/supabase/types.ts
 
-export type Role            = "admin" | "staff" | "client";
+export type Role            = "admin" | "staff" | "trainer" | "client";
 export type MembershipPlan  = "basic" | "premium" | "vip";
 export type MembershipStatus = "active" | "expired" | "cancelled" | "frozen";
 export type InvoiceStatus   = "paid" | "pending" | "overdue" | "refunded";

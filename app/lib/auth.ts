@@ -1,6 +1,6 @@
 // ── Role & profile types ──────────────────────────────────────────────────────
 
-export type Role = "admin" | "staff" | "client";
+export type Role = "admin" | "staff" | "trainer" | "client";
 
 /** Shape of the `profiles` table row */
 export interface Profile {
@@ -35,14 +35,15 @@ export const SESSION_KEY  = "gritfit_user";
 // ── Route access map ──────────────────────────────────────────────────────────
 
 export const ROLE_ROUTES: Record<Role, string[]> = {
-  admin:  ["/", "/revenue", "/classes", "/trainers", "/billing", "/admin/users", "/staff", "/client"],
-  staff:  ["/staff", "/classes", "/trainers"],
-  client: ["/client"],
+  admin:   ["/", "/revenue", "/classes", "/trainers", "/billing", "/admin/users", "/staff", "/client", "/trainer", "/profile"],
+  staff:   ["/staff", "/classes", "/trainers", "/profile"],
+  trainer: ["/trainer", "/classes", "/trainers", "/profile"],
+  client:  ["/client", "/profile"],
 };
 
 export const ALL_PROTECTED = [
   "/", "/revenue", "/classes", "/trainers", "/billing",
-  "/admin/users", "/staff", "/client",
+  "/admin/users", "/staff", "/client", "/trainer", "/profile",
 ];
 
 export const AUTH_ROUTES = ["/login", "/signup"];
@@ -50,14 +51,16 @@ export const AUTH_ROUTES = ["/login", "/signup"];
 // ── Role helpers ──────────────────────────────────────────────────────────────
 
 export function homeForRole(role: Role): string {
-  if (role === "admin") return "/";
-  if (role === "staff") return "/staff";
+  if (role === "admin")   return "/";
+  if (role === "staff")   return "/staff";
+  if (role === "trainer") return "/trainer";
   return "/client";
 }
 
 export function avatarColorForRole(role: Role): string {
-  if (role === "admin") return "lime";
-  if (role === "staff") return "orange";
+  if (role === "admin")   return "lime";
+  if (role === "staff")   return "orange";
+  if (role === "trainer") return "teal";
   return "blue";
 }
 

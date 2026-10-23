@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { getSessionUser, ROLE_COOKIE, SESSION_KEY, clearSessionUser, type Role, type SessionUser } from "@/app/lib/auth";
+import { getSessionUser, ROLE_COOKIE, clearSessionUser, type Role, type SessionUser } from "@/app/lib/auth";
 import { createClient } from "@/app/lib/supabase/client";
 import type { Profile, SessionEnrollment, Checkin } from "@/app/lib/supabase/types";
 
@@ -10,11 +10,11 @@ type CheckinWithProfile = Checkin & { profiles: Pick<Profile, "full_name" | "ava
 
 export default function Home() {
   const router = useRouter();
-  const [sessions, setSessions]   = useState<SessionEnrollment[]>([]);
-  const [checkins, setCheckins]   = useState<CheckinWithProfile[]>([]);
+  const [sessions, setSessions]       = useState<SessionEnrollment[]>([]);
+  const [checkins, setCheckins]       = useState<CheckinWithProfile[]>([]);
   const [memberCount, setMemberCount] = useState<number | null>(null);
-  const [revenue, setRevenue]     = useState<number | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [revenue, setRevenue]         = useState<number | null>(null);
+  const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
     const u = getSessionUser();
@@ -52,7 +52,7 @@ export default function Home() {
     <main className="dashboard-shell">
       <Sidebar active="dashboard" />
       <section className="content">
-        <Topbar title="Executive Dashboard" searchPlaceholder="Search members, classes…" />
+        <Topbar title="Executive Dashboard" />
 
         <div className="page-body">
           <div className="metrics">
@@ -93,7 +93,6 @@ export default function Home() {
               </div>
 
               <div className="two-col">
-                {/* Recent check-ins */}
                 <div className="panel">
                   <div className="panel-heading"><h2>Recent Check-ins</h2><button className="view-all">View all</button></div>
                   {loading
@@ -116,7 +115,6 @@ export default function Home() {
                     )}
                 </div>
 
-                {/* Trainer utilization (static) */}
                 <div className="panel">
                   <div className="panel-heading"><h2>Trainer Utilization</h2><button className="more">•••</button></div>
                   <div className="donut-section">
@@ -135,9 +133,8 @@ export default function Home() {
             </div>
 
             <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              {/* Today's schedule */}
               <div className="panel">
-                <div className="panel-heading"><h2>Today's Schedule</h2><button className="view-all">View all</button></div>
+                <div className="panel-heading"><h2>Today&apos;s Schedule</h2><button className="view-all">View all</button></div>
                 {loading
                   ? <div style={{ padding: "24px 14px", textAlign: "center", color: "#505660", fontSize: 9 }}>Loading…</div>
                   : sessions.length === 0
@@ -161,7 +158,6 @@ export default function Home() {
                   )}
               </div>
 
-              {/* Quick stats */}
               <div className="panel">
                 <div className="panel-heading"><h2>Quick Stats</h2></div>
                 <div className="stat-row"><span className="label">Client Members</span><span className="val lime">{memberCount ?? "—"}</span></div>
@@ -181,7 +177,7 @@ export default function Home() {
 
 // ── Shared Topbar ─────────────────────────────────────────────────────────────
 
-export function Topbar({ title, searchPlaceholder = "Search…" }: { title: string; searchPlaceholder?: string }) {
+export function Topbar({ title }: { title: string }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
@@ -193,10 +189,6 @@ export function Topbar({ title, searchPlaceholder = "Search…" }: { title: stri
     <header className="topbar">
       <h1>{title}</h1>
       <div className="top-actions">
-        <label className="search">
-          <span>⌕</span>
-          <input aria-label="Search" placeholder={searchPlaceholder} />
-        </label>
         <div className="topbar-datetime">
           <span className="topbar-date">{dateStr}</span>
           <span className="topbar-time">{timeStr}</span>
@@ -211,30 +203,39 @@ export function Topbar({ title, searchPlaceholder = "Search…" }: { title: stri
 
 const NAV_BY_ROLE: Record<Role, { href:string; label:string; icon:string; key:string }[]> = {
   admin: [
-    { href:"/",            label:"Dashboard",          icon:"◉", key:"dashboard"  },
-    { href:"/revenue",     label:"Revenue",            icon:"◒", key:"revenue"    },
-    { href:"/classes",     label:"Classes & Timetable",icon:"▣", key:"classes"    },
-    { href:"/trainers",    label:"Trainer Roster",     icon:"♙", key:"trainers"   },
-    { href:"/billing",     label:"Billing & Payments", icon:"▤", key:"billing"    },
-    { href:"/admin/users", label:"User Management",    icon:"⊞", key:"users"      },
+    { href:"/",            label:"Dashboard",          icon:"◉", key:"dashboard" },
+    { href:"/revenue",     label:"Revenue",            icon:"◒", key:"revenue"   },
+    { href:"/classes",     label:"Classes & Timetable",icon:"▣", key:"classes"   },
+    { href:"/trainers",    label:"Trainer Roster",     icon:"♙", key:"trainers"  },
+    { href:"/billing",     label:"Billing & Payments", icon:"▤", key:"billing"   },
+    { href:"/admin/users", label:"User Management",    icon:"⊞", key:"users"     },
+    { href:"/profile",     label:"My Profile",         icon:"◌", key:"profile"   },
   ],
   staff: [
-    { href:"/staff",    label:"My Dashboard",       icon:"◉", key:"staff"    },
-    { href:"/classes",  label:"Classes & Timetable",icon:"▣", key:"classes"  },
-    { href:"/trainers", label:"Trainer Roster",     icon:"♙", key:"trainers" },
+    { href:"/staff",    label:"My Dashboard",        icon:"◉", key:"staff"    },
+    { href:"/classes",  label:"Classes & Timetable", icon:"▣", key:"classes"  },
+    { href:"/trainers", label:"Trainer Roster",      icon:"♙", key:"trainers" },
+    { href:"/profile",  label:"My Profile",          icon:"◌", key:"profile"  },
+  ],
+  trainer: [
+    { href:"/trainer",  label:"My Dashboard",        icon:"◉", key:"trainer"  },
+    { href:"/classes",  label:"Classes & Timetable", icon:"▣", key:"classes"  },
+    { href:"/trainers", label:"Trainer Roster",      icon:"♙", key:"trainers" },
+    { href:"/profile",  label:"My Profile",          icon:"◌", key:"profile"  },
   ],
   client: [
-    { href:"/client", label:"My Dashboard", icon:"◉", key:"client" },
+    { href:"/client",  label:"My Dashboard", icon:"◉", key:"client"  },
+    { href:"/profile", label:"My Profile",   icon:"◌", key:"profile" },
   ],
 };
 
-const ROLE_LABEL: Record<Role, string> = { admin:"Admin", staff:"Staff", client:"Client" };
-const ROLE_COLOR: Record<Role, string> = { admin:"#c7fa00", staff:"#ffad3c", client:"#7fa4f0" };
+const ROLE_LABEL: Record<Role, string> = { admin:"Admin", staff:"Staff", trainer:"Trainer", client:"Client" };
+const ROLE_COLOR: Record<Role, string> = { admin:"#c7fa00", staff:"#ffad3c", trainer:"#00c9a7", client:"#7fa4f0" };
 const ROLE_BG:    Record<Role, string> = {
-  admin:"rgba(199,250,0,.1)", staff:"rgba(255,173,60,.1)", client:"rgba(127,164,240,.1)",
+  admin:"rgba(199,250,0,.1)", staff:"rgba(255,173,60,.1)", trainer:"rgba(0,201,167,.1)", client:"rgba(127,164,240,.1)",
 };
 
-// ── Shared Sidebar ─────────────────────────────────────────────────────────────
+// ── Shared Sidebar ────────────────────────────────────────────────────────────
 
 export function Sidebar({ active }: { active: string }) {
   const router = useRouter();
@@ -286,10 +287,10 @@ export function Sidebar({ active }: { active: string }) {
         <div className={`avatar avatar-${user?.avatarColor ?? "lime"}`}>
           {user?.avatar ?? "?"}
         </div>
-        <div>
+        <a href="/profile" style={{ minWidth: 0, flex: 1, textDecoration: "none", color: "inherit" }} title="Edit profile">
           <strong>{user?.name ?? "…"}</strong>
           <small>{user?.title ?? ""}</small>
-        </div>
+        </a>
         <button className="logout-btn" onClick={handleLogout} aria-label="Log out" title="Log out">⏻</button>
       </div>
     </aside>

@@ -3,7 +3,7 @@ import { createClient } from "@/app/lib/supabase/server";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import type { Role } from "@/app/lib/auth";
 
-const roles: Role[] = ["admin", "staff", "client"];
+const roles: Role[] = ["admin", "staff", "trainer", "client"];
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 
   if (profileError) {
     await admin.auth.admin.deleteUser(authData.user.id);
-    return NextResponse.json({ error: "Unable to create the user profile." }, { status: 500 });
+    return NextResponse.json({ error: `Unable to create the user profile: ${profileError.message}` }, { status: 500 });
   }
 
   return NextResponse.json({ id: authData.user.id }, { status: 201 });

@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Sidebar, Topbar } from "@/app/page";
 import { getSessionUser } from "@/app/lib/auth";
 import { createClient } from "@/app/lib/supabase/client";
-import type { Invoice, Profile } from "@/app/lib/supabase/types";
+import type { Invoice, Profile, Membership } from "@/app/lib/supabase/types";
 
 type InvoiceWithClient = Invoice & { profiles: Pick<Profile, "full_name"> };
+
+type PlanStats = { members: number; revenue_cents: number };
 
 const STATUS_MAP: Record<string, string> = {
   paid: "pill-paid", pending: "pill-pending", overdue: "pill-overdue", refunded: "pill-refunded",
@@ -46,8 +48,9 @@ function PlanCard({ name, price, members, revenue, color, pct }: { name: string;
 
 export default function BillingPage() {
   const router = useRouter();
-  const [invoices, setInvoices] = useState<InvoiceWithClient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [invoices, setInvoices]   = useState<InvoiceWithClient[]>([]);
+  const [planStats, setPlanStats] = useState<Record<string, PlanStats>>({});
+  const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     const u = getSessionUser();
@@ -57,11 +60,21 @@ export default function BillingPage() {
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-    const { data } = await supabase
-      .from("invoices")
-      .select("*, profiles(full_name)")
-      .order("due_at", { ascending: false });
-    if (data) setInvoices(data as InvoiceWithClient[]);
+    const [invoiceRes, membershipRes] = await Promise.all([
+      supabase.from("invoices").select("*, profiles(full_name)").order("due_at", { ascending: false }),
+      supabase.from("memberships").select("plan, price_cents, status").eq("status", "active"),
+    ]);
+    if (invoiceRes.data) setInvoices(invoiceRes.data as InvoiceWithClient[]);
+    if (membershipRes.data) {
+      const stats: Record<string, PlanStats> = { basic: { members: 0, revenue_cents: 0 }, premium: { members: 0, revenue_cents: 0 }, vip: { members: 0, revenue_cents: 0 } };
+      for (const m of membershipRes.data as Pick<Membership, "plan" | "price_cents" | "status">[]) {
+        if (stats[m.plan]) {
+          stats[m.plan].members += 1;
+          stats[m.plan].revenue_cents += m.price_cents;
+        }
+      }
+      setPlanStats(stats);
+    }
     setLoading(false);
   }, []);
 
@@ -82,7 +95,7 @@ export default function BillingPage() {
     <main className="dashboard-shell">
       <Sidebar active="billing" />
       <section className="content">
-          <Topbar title="Billing &amp; Payments" searchPlaceholder="Search invoices…" />
+          <Topbar title="Billing &amp; Payments" />
 
         <div className="page-body">
           <div className="metrics">
@@ -142,9 +155,32 @@ export default function BillingPage() {
               <div className="panel">
                 <div className="panel-heading"><h2>Subscription Plans</h2></div>
                 <div style={{ padding: "6px 14px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <PlanCard name="Basic"   price="$29/mo"  members={980}  revenue="$28,420" color="#7fa4f0" pct={40} />
-                  <PlanCard name="Premium" price="$49/mo"  members={1102} revenue="$53,998" color="#c7fa00" pct={100} />
-                  <PlanCard name="VIP"     price="$99/mo"  members={399}  revenue="$39,501" color="#ffad3c" pct={73} />
+                  {loading
+                    ? <div style={{ padding: "16px 0", textAlign: "center", color: "#505660", fontSize: 9 }}>Loading…</div>
+                    : (() => {
+                      const plans = [
+                        { key: "basic",   name: "Basic",   price: "$29/mo", color: "#7fa4f0" },
+                        { key: "premium", name: "Premium", price: "$49/mo", color: "#c7fa00" },
+                        { key: "vip",     name: "VIP",     price: "$99/mo", color: "#ffad3c" },
+                      ];
+                      const maxMembers = Math.max(...plans.map(p => planStats[p.key]?.members ?? 0), 1);
+                      return plans.map(p => {
+                        const stats = planStats[p.key] ?? { members: 0, revenue_cents: 0 };
+                        const pct   = Math.round((stats.members / maxMembers) * 100);
+                        return (
+                          <PlanCard
+                            key={p.key}
+                            name={p.name}
+                            price={p.price}
+                            members={stats.members}
+                            revenue={fmt(stats.revenue_cents)}
+                            color={p.color}
+                            pct={pct}
+                          />
+                        );
+                      });
+                    })()
+                  }
                 </div>
               </div>
 
