@@ -270,6 +270,8 @@ left join public.profiles  p on p.id = t.id
 left join public.bookings  b on b.session_id = s.id
 group by s.id, c.id, p.full_name;
 
+grant select on public.session_enrollment to authenticated;
+
 -- Revenue summary per client
 create or replace view public.client_revenue as
 select
@@ -281,6 +283,8 @@ select
 from public.invoices i
 join public.profiles p on p.id = i.client_id
 group by i.client_id, p.full_name;
+
+grant select on public.client_revenue to authenticated;
 
 -- ── 13. RLS helpers ───────────────────────────────────────────────────────────
 create or replace function public.current_user_role()
@@ -326,6 +330,9 @@ create policy "profiles: own update"
 
 create policy "profiles: admin read"
   on public.profiles for select using (public.is_admin());
+
+create policy "profiles: staff read"
+  on public.profiles for select using (public.is_staff_or_admin());
 
 create policy "profiles: admin write"
   on public.profiles for update using (public.is_admin());
@@ -459,6 +466,7 @@ create index if not exists idx_checkins_client       on public.checkins (client_
 create index if not exists idx_checkins_date         on public.checkins (checked_in_at);
 
 -- ── 16. Seed demo data ────────────────────────────────────────────────────────
+/*
 -- HOW TO SEED:
 --   1. Go to Supabase Dashboard → Authentication → Users → Add user (x8)
 --      Use "Create user" (not invite) so email is auto-confirmed.
@@ -476,7 +484,7 @@ create index if not exists idx_checkins_date         on public.checkins (checked
 --   3. Replace every placeholder below (uuid-lance, uuid-diana, …) with the real UUIDs.
 --   4. Run the entire block in SQL Editor.
 
-/*
+
 -- ── Profiles ──────────────────────────────────────────────────────────────────
 insert into public.profiles (id, full_name, avatar_initials, avatar_color, title, role)
 values
@@ -605,3 +613,66 @@ insert into public.checkins (client_id, session_id, checked_in_at, note) values
   ('uuid-maria', 'ses-spin-mon', now() - interval '3 hours 10 minutes', '')
 on conflict do nothing;
 */
+
+-- ── Runnable class catalog and upcoming sessions ────────────────────────────
+-- Uses generated UUIDs so this works without manually-created demo accounts.
+-- Safe to rerun: existing classes and session times are left in place.
+insert into public.classes (title, room, color, capacity, duration_min)
+select seed.title, seed.room, seed.color, seed.capacity, 60
+from (values
+  ('HIIT Performance', 'Studio A', 'red',    12),
+  ('CrossFit WOD',     'Studio B', 'lime',   22),
+  ('Ashtanga Yoga',    'Mind & Body', 'teal',25),
+  ('Pilates',          'Studio C', 'purple', 15),
+  ('Spin Cycle',       'Spin Studio', 'blue',20)
+) as seed(title, room, color, capacity)
+where not exists (
+  select 1 from public.classes c where lower(c.title) = lower(seed.title)
+);
+
+with schedule(title, day_of_week, start_time) as (
+  values
+    ('HIIT Performance', 1, time '09:00'),
+    ('HIIT Performance', 3, time '09:00'),
+    ('HIIT Performance', 5, time '09:00'),
+    ('HIIT Performance', 0, time '09:00'),
+    ('CrossFit WOD',     1, time '19:00'),
+    ('CrossFit WOD',     3, time '19:00'),
+    ('CrossFit WOD',     5, time '19:00'),
+    ('Ashtanga Yoga',    2, time '09:00'),
+    ('Ashtanga Yoga',    4, time '09:00'),
+    ('Ashtanga Yoga',    6, time '09:00'),
+    ('Pilates',          2, time '11:30'),
+    ('Pilates',          4, time '11:30'),
+    ('Spin Cycle',       1, time '08:00'),
+    ('Spin Cycle',       2, time '08:00'),
+    ('Spin Cycle',       4, time '08:00'),
+    ('Spin Cycle',       6, time '08:00')
+), dates as (
+  select day::date as day
+  from generate_series(current_date, current_date + 13, interval '1 day') as days(day)
+), occurrences as (
+  select
+    c.id as class_id,
+    d.day,
+    s.start_time,
+    (d.day + s.start_time) at time zone 'Asia/Manila' as starts_at,
+    (d.day + s.start_time + interval '60 minutes') at time zone 'Asia/Manila' as ends_at
+  from schedule s
+  join dates d on extract(dow from d.day)::int = s.day_of_week
+  join public.classes c on lower(c.title) = lower(s.title)
+)
+insert into public.class_sessions (id, class_id, starts_at, ends_at)
+select
+  (substr(hash, 1, 8) || '-' || substr(hash, 9, 4) || '-' || substr(hash, 13, 4) || '-' ||
+   substr(hash, 17, 4) || '-' || substr(hash, 21, 12))::uuid,
+  o.class_id,
+  o.starts_at,
+  o.ends_at
+from occurrences o
+cross join lateral (select md5(o.class_id::text || '|' || o.starts_at::text) as hash) h
+where not exists (
+  select 1 from public.class_sessions existing
+  where existing.class_id = o.class_id and existing.starts_at = o.starts_at
+)
+on conflict (id) do nothing;

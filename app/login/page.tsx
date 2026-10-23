@@ -12,6 +12,7 @@ import {
   type Role,
   type Profile,
 } from "@/app/lib/auth";
+import OtpStep from "@/app/components/OtpStep";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,6 +20,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fields, setFields] = useState({ email: "", password: "", remember: false });
+  const [otpPending, setOtpPending] = useState(false);
+  const [pendingProfile, setPendingProfile] = useState<Profile | null>(null);
+  const [pendingAuthUser, setPendingAuthUser] = useState<{ id: string; email?: string } | null>(null);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
@@ -32,14 +36,12 @@ export default function LoginPage() {
     if (!fields.email.trim()) { setError("Email address is required."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) { setError("Enter a valid email address."); return; }
     if (!fields.password) { setError("Password is required."); return; }
-    if (fields.password.length < 6) { setError("Password must be at least 6 characters."); return; }
 
     setLoading(true);
     setError("");
 
     const supabase = createClient();
 
-    // 1. Sign in with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: fields.email,
       password: fields.password,
@@ -51,7 +53,6 @@ export default function LoginPage() {
       return;
     }
 
-    // 2. Fetch the user's profile (role, name, avatar, etc.)
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
@@ -66,16 +67,39 @@ export default function LoginPage() {
 
     const typedProfile = profile as Profile;
 
-    // 3. Set role cookie so middleware can do role-based routing without a DB hit
+    // Admin skips OTP
+    if (typedProfile.role === "admin") {
+      const maxAge = fields.remember ? "; max-age=604800" : "";
+      document.cookie = `${ROLE_COOKIE}=${typedProfile.role}; path=/; SameSite=Lax${maxAge}`;
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(buildSessionUser(authData.user, typedProfile)));
+      router.push(homeForRole(typedProfile.role as Role));
+      return;
+    }
+
+    // Staff and client: send OTP
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: fields.email,
+      options: { shouldCreateUser: false },
+    });
+
+    setLoading(false);
+
+    if (otpError) {
+      setError("Failed to send verification code. Please try again.");
+      return;
+    }
+
+    setPendingProfile(typedProfile);
+    setPendingAuthUser(authData.user);
+    setOtpPending(true);
+  }
+
+  function handleOtpVerified() {
+    if (!pendingProfile || !pendingAuthUser) return;
     const maxAge = fields.remember ? "; max-age=604800" : "";
-    document.cookie = `${ROLE_COOKIE}=${typedProfile.role}; path=/; SameSite=Lax${maxAge}`;
-
-    // 4. Store display info in sessionStorage
-    const sessionUser = buildSessionUser(authData.user, typedProfile);
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-
-    // 5. Redirect to the correct home for this role
-    router.push(homeForRole(typedProfile.role as Role));
+    document.cookie = `${ROLE_COOKIE}=${pendingProfile.role}; path=/; SameSite=Lax${maxAge}`;
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(buildSessionUser(pendingAuthUser, pendingProfile)));
+    router.push(homeForRole(pendingProfile.role as Role));
   }
 
   return (
@@ -83,87 +107,128 @@ export default function LoginPage() {
       <div className="auth-glow auth-glow-one" />
       <div className="auth-glow auth-glow-two" />
 
-      <section className="auth-card" aria-labelledby="login-title">
+      <aside className="auth-panel" aria-hidden="true">
+        <div className="auth-panel-inner">
+          <div className="auth-panel-logo">
+            <span className="brand-mark">✦</span>
+          </div>
+          <blockquote className="auth-panel-quote">
+            <p>&quot;Every rep is a vote<br />for the person<br />you&apos;re becoming.&quot;</p>
+          </blockquote>
+          <div className="auth-panel-stats">
+            <div className="auth-panel-stat">
+              <strong>2,400+</strong>
+              <span>Active members</span>
+            </div>
+            <div className="auth-panel-stat">
+              <strong>48</strong>
+              <span>Weekly classes</span>
+            </div>
+            <div className="auth-panel-stat">
+              <strong>12</strong>
+              <span>Expert trainers</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section className="auth-card auth-card-animate" aria-labelledby="login-title">
         <Link className="auth-brand" href="/login" aria-label="GritFit">
           <span className="brand-mark">✦</span>
           <span>GRITFIT<small>FITNESS CENTER</small></span>
         </Link>
 
-        <div className="auth-intro">
-          <p className="eyebrow">Member portal</p>
-          <h1 id="login-title">Welcome back.</h1>
-          <p>Sign in to keep your training moving forward.</p>
-        </div>
-
-        <form className="auth-form" onSubmit={handleSubmit} noValidate>
-          {error && (
-            <div role="alert" style={{
-              background: "rgba(227,100,100,.1)", border: "1px solid rgba(227,100,100,.35)",
-              borderRadius: 4, color: "#e36464", fontSize: 9, padding: "9px 11px", marginBottom: 2,
-            }}>
-              {error}
-            </div>
-          )}
-
-          <label htmlFor="email">Email address</label>
-          <input
-            id="email" name="email" type="email" placeholder="you@gritfit.com"
-            autoComplete="email" value={fields.email} onChange={handleChange}
-            disabled={loading} required
+        {otpPending ? (
+          <OtpStep
+            email={fields.email}
+            onVerified={handleOtpVerified}
+            onBack={() => { setOtpPending(false); setError(""); }}
           />
+        ) : (
+          <>
+            <div className="auth-intro">
+              <p className="eyebrow">Member portal</p>
+              <h1 id="login-title">Welcome back.</h1>
+              <p>Sign in to keep your training moving forward.</p>
+            </div>
 
-          <div className="field-label-row">
-            <label htmlFor="password">Password</label>
-          </div>
-          <div className="password-field">
-            <input
-              id="password" name="password" type={showPassword ? "text" : "password"}
-              placeholder="Enter your password" autoComplete="current-password"
-              value={fields.password} onChange={handleChange} disabled={loading} required
-            />
-            <button type="button" onClick={() => setShowPassword(v => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}>
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
+            <form className="auth-form" onSubmit={handleSubmit} noValidate>
+              {error && (
+                <div role="alert" className="auth-alert auth-alert-error">
+                  <span className="auth-alert-icon">⚠</span>
+                  <span>{error}</span>
+                </div>
+              )}
 
-          <label className="checkbox-label">
-            <input type="checkbox" name="remember" checked={fields.remember} onChange={handleChange} />
-            <span>Keep me signed in</span>
-          </label>
-
-          <button className="auth-submit" type="submit" disabled={loading}
-            style={{ opacity: loading ? .7 : 1 }}>
-            {loading ? "Signing in…" : "Sign in"}{!loading && <span>↗</span>}
-          </button>
-        </form>
-
-        {/* Role hint box */}
-        <div style={{
-          marginTop: 18, padding: "12px 14px",
-          background: "rgba(199,250,0,.04)", border: "1px solid rgba(199,250,0,.1)", borderRadius: 6,
-        }}>
-          <div style={{ fontSize: 8, fontWeight: 700, color: "#c7fa00", letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 8 }}>
-            Account roles
-          </div>
-          <div style={{ display: "grid", gap: 5 }}>
-            {([
-              { role: "Admin",  color: "#c7fa00", desc: "Full access — revenue, billing, user management" },
-              { role: "Staff",  color: "#ffad3c", desc: "Classes, trainer roster, check-ins"              },
-              { role: "Client", color: "#7fa4f0", desc: "Personal schedule, membership & billing"         },
-            ]).map(d => (
-              <div key={d.role} style={{ display: "flex", gap: 8, fontSize: 8 }}>
-                <span style={{ color: d.color, fontWeight: 700, width: 44, flexShrink: 0 }}>{d.role}</span>
-                <span style={{ color: "#505660" }}>{d.desc}</span>
+              <div className="auth-field">
+                <label htmlFor="email">Email address</label>
+                <input
+                  id="email" name="email" type="email" placeholder="you@gritfit.com"
+                  autoComplete="email" value={fields.email} onChange={handleChange}
+                  disabled={loading} required
+                />
               </div>
-            ))}
-          </div>
-        </div>
 
-        <p className="auth-switch">New to GritFit? <Link href="/signup">Create an account</Link></p>
-        <p className="auth-footer">
-          By continuing you agree to our <a href="#">terms</a> and <a href="#">privacy policy</a>.
-        </p>
+              <div className="auth-field">
+                <div className="field-label-row">
+                  <label htmlFor="password">Password</label>
+                  <Link href="#" className="forgot-link" tabIndex={0}
+                    onClick={e => e.preventDefault()}>
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="password-field">
+                  <input
+                    id="password" name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    value={fields.password} onChange={handleChange}
+                    disabled={loading} required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <label className="checkbox-label">
+                <input type="checkbox" name="remember" checked={fields.remember} onChange={handleChange} />
+                <span>Keep me signed in for 7 days</span>
+              </label>
+
+              <button className="auth-submit" type="submit" disabled={loading} aria-busy={loading}>
+                {loading ? (
+                  <>
+                    <span className="auth-spinner" aria-hidden="true" />
+                    Signing in…
+                  </>
+                ) : (
+                  <>
+                    Sign in
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="auth-switch">
+              New to GritFit? <Link href="/signup">Create an account</Link>
+            </p>
+            <p className="auth-footer">
+              By continuing you agree to our <a href="#">terms</a> and <a href="#">privacy policy</a>.
+            </p>
+          </>
+        )}
       </section>
 
       <div className="auth-side-note">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Sidebar } from "@/app/page";
+import { Sidebar, Topbar } from "@/app/page";
 import { getSessionUser } from "@/app/lib/auth";
 import { createClient } from "@/app/lib/supabase/client";
 import type { Invoice, Profile } from "@/app/lib/supabase/types";
@@ -80,13 +80,7 @@ export default function RevenuePage() {
     <main className="dashboard-shell">
       <Sidebar active="revenue" />
       <section className="content">
-        <header className="topbar">
-          <h1>Revenue</h1>
-          <div className="top-actions">
-            <label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search transactions…" /></label>
-            <button className="status">System Active</button>
-          </div>
-        </header>
+          <Topbar title="Revenue" searchPlaceholder="Search transactions…" />
 
         <div className="page-body">
           <div className="metrics">

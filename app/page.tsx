@@ -52,14 +52,7 @@ export default function Home() {
     <main className="dashboard-shell">
       <Sidebar active="dashboard" />
       <section className="content">
-        <header className="topbar">
-          <h1>Executive Dashboard</h1>
-          <div className="top-actions">
-            <label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search members, classes…" /></label>
-            <button className="status">System Active</button>
-            <button className="icon-button" aria-label="Notifications">🔔</button>
-          </div>
-        </header>
+        <Topbar title="Executive Dashboard" searchPlaceholder="Search members, classes…" />
 
         <div className="page-body">
           <div className="metrics">
@@ -183,6 +176,34 @@ export default function Home() {
         </div>
       </section>
     </main>
+  );
+}
+
+// ── Shared Topbar ─────────────────────────────────────────────────────────────
+
+export function Topbar({ title, searchPlaceholder = "Search…" }: { title: string; searchPlaceholder?: string }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
+  const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  return (
+    <header className="topbar">
+      <h1>{title}</h1>
+      <div className="top-actions">
+        <label className="search">
+          <span>⌕</span>
+          <input aria-label="Search" placeholder={searchPlaceholder} />
+        </label>
+        <div className="topbar-datetime">
+          <span className="topbar-date">{dateStr}</span>
+          <span className="topbar-time">{timeStr}</span>
+        </div>
+        <button className="icon-button" aria-label="Notifications">🔔</button>
+      </div>
+    </header>
   );
 }
 

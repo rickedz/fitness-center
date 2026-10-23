@@ -1,0 +1,1 @@
+// vitest setup — intentionally minimal

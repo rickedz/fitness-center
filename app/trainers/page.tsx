@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Sidebar } from "@/app/page";
+import { Sidebar, Topbar } from "@/app/page";
 import { createClient } from "@/app/lib/supabase/client";
 import type { Trainer, Profile, SessionEnrollment } from "@/app/lib/supabase/types";
 
@@ -55,13 +55,7 @@ export default function TrainersPage() {
     <main className="dashboard-shell">
       <Sidebar active="trainers" />
       <section className="content">
-        <header className="topbar">
-          <h1>Trainer Roster</h1>
-          <div className="top-actions">
-            <label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search trainers…" /></label>
-            <button className="status">System Active</button>
-          </div>
-        </header>
+          <Topbar title="Trainer Roster" searchPlaceholder="Search trainers…" />
 
         <div className="page-body">
           <div className="metrics">

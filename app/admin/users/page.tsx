@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/app/page";
 import { createClient } from "@/app/lib/supabase/client";
-import { createAdminClient } from "@/app/lib/supabase/admin";
 import { getSessionUser, type Profile, type Role } from "@/app/lib/auth";
 
 const ROLE_COLOR: Record<Role, string> = { admin: "#c7fa00", staff: "#ffad3c", client: "#7fa4f0" };
@@ -99,43 +98,18 @@ export default function AdminUsersPage() {
       return;
     }
     setSaving(true);
-    const initials = newUser.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-    const colors   = ["orange", "blue", "teal", "red", "purple", "lime"] as const;
-    const color    = colors[profiles.length % colors.length];
-    const title    = newUser.title ||
-      (newUser.role === "admin" ? "Administrator" : newUser.role === "staff" ? "Staff Member" : "Basic Member");
-
-    // Use the admin (service-role) client so the current admin session is
-    // never replaced by the newly created user's session.
-    const admin = createAdminClient();
-    const { data: authData, error: authError } = await admin.auth.admin.createUser({
-      email:             newUser.email,
-      password:          newUser.password,
-      email_confirm:     true,
-      user_metadata: {
-        full_name:       newUser.name,
-        avatar_initials: initials,
-        avatar_color:    color,
-        title,
-      },
+    const response = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newUser),
     });
+    const result = await response.json() as { error?: string };
 
-    if (authError || !authData.user) {
-      alert("Failed to create user: " + (authError?.message ?? "Unknown error"));
+    if (!response.ok) {
+      alert("Failed to create user: " + (result.error ?? "Unknown error"));
       setSaving(false);
       return;
     }
-
-    // Upsert profile with the correct role (trigger always sets 'client')
-    const supabase = createClient();
-    await supabase.from("profiles").upsert({
-      id:              authData.user.id,
-      full_name:       newUser.name,
-      avatar_initials: initials,
-      avatar_color:    color,
-      title,
-      role:            newUser.role,
-    });
 
     setNewUser({ name: "", email: "", password: "", role: "client", title: "" });
     setShowAdd(false);
@@ -203,7 +177,7 @@ export default function AdminUsersPage() {
                 {([
                   { label: "Full Name",    key: "name",     placeholder: "John Doe",          type: "text"     },
                   { label: "Email",        key: "email",    placeholder: "john@example.com",  type: "email"    },
-                  { label: "Password",     key: "password", placeholder: "Min 6 characters",  type: "password" },
+                  { label: "Password",     key: "password", placeholder: "Min 8 characters",  type: "password" },
                   { label: "Job Title",    key: "title",    placeholder: "e.g. Head Trainer", type: "text"     },
                 ] as { label:string; key: keyof typeof newUser; placeholder:string; type:string }[]).map(f => (
                   <div key={f.key}>

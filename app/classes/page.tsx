@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Sidebar } from "@/app/page";
+import { Sidebar, Topbar } from "@/app/page";
 import { createClient } from "@/app/lib/supabase/client";
 import type { SessionEnrollment, Class, Profile, Trainer } from "@/app/lib/supabase/types";
 
@@ -64,13 +64,7 @@ export default function ClassesPage() {
     <main className="dashboard-shell">
       <Sidebar active="classes" />
       <section className="content">
-        <header className="topbar">
-          <h1>Classes &amp; Timetable</h1>
-          <div className="top-actions">
-            <label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search classes…" /></label>
-            <button className="status">System Active</button>
-          </div>
-        </header>
+          <Topbar title="Classes &amp; Timetable" searchPlaceholder="Search classes…" />
 
         <div className="page-body">
           <div className="metrics">

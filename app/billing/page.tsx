@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Sidebar } from "@/app/page";
+import { Sidebar, Topbar } from "@/app/page";
 import { getSessionUser } from "@/app/lib/auth";
 import { createClient } from "@/app/lib/supabase/client";
 import type { Invoice, Profile } from "@/app/lib/supabase/types";
@@ -82,13 +82,7 @@ export default function BillingPage() {
     <main className="dashboard-shell">
       <Sidebar active="billing" />
       <section className="content">
-        <header className="topbar">
-          <h1>Billing &amp; Payments</h1>
-          <div className="top-actions">
-            <label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search invoices…" /></label>
-            <button className="status">System Active</button>
-          </div>
-        </header>
+          <Topbar title="Billing &amp; Payments" searchPlaceholder="Search invoices…" />
 
         <div className="page-body">
           <div className="metrics">

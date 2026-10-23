@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Sidebar } from "@/app/page";
+import { Sidebar, Topbar } from "@/app/page";
 import { getSessionUser, type SessionUser } from "@/app/lib/auth";
 import { createClient } from "@/app/lib/supabase/client";
-import type { SessionEnrollment, Checkin, Profile } from "@/app/lib/supabase/types";
+import type { SessionEnrollment, Checkin, Profile, Membership } from "@/app/lib/supabase/types";
 
 type CheckinWithProfile = Checkin & { profiles: Pick<Profile, "full_name" | "avatar_color" | "avatar_initials"> };
+type ClientWithMembership = Profile & { memberships: Pick<Membership, "plan" | "status">[] };
 
 function Empty({ message }: { message: string }) {
   return <div style={{ padding: "32px 14px", textAlign: "center", color: "#3a3e44", fontSize: 9 }}>{message}</div>;
@@ -28,7 +29,7 @@ export default function StaffPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [sessions, setSessions] = useState<SessionEnrollment[]>([]);
   const [checkins, setCheckins] = useState<CheckinWithProfile[]>([]);
-  const [clients, setClients] = useState<Profile[]>([]);
+  const [clients, setClients] = useState<ClientWithMembership[]>([]);
   const [checkingIn, setCheckingIn] = useState(false);
   const [selectedClient, setSelectedClient] = useState("");
   const [selectedSession, setSelectedSession] = useState("");
@@ -51,12 +52,12 @@ export default function StaffPage() {
     const [sesRes, checkinRes, clientRes] = await Promise.all([
       supabase.from("session_enrollment").select("*").gte("starts_at", todayStart.toISOString()).lte("starts_at", todayEnd.toISOString()).order("starts_at"),
       supabase.from("checkins").select("*, profiles(full_name, avatar_color, avatar_initials)").gte("checked_in_at", todayStart.toISOString()).order("checked_in_at", { ascending: false }),
-      supabase.from("profiles").select("*").eq("role", "client").order("full_name"),
+      supabase.from("profiles").select("*, memberships(plan, status)").eq("role", "client").order("full_name"),
     ]);
 
     if (sesRes.data)     setSessions(sesRes.data as SessionEnrollment[]);
     if (checkinRes.data) setCheckins(checkinRes.data as CheckinWithProfile[]);
-    if (clientRes.data)  setClients(clientRes.data as Profile[]);
+    if (clientRes.data)  setClients(clientRes.data as ClientWithMembership[]);
     setLoading(false);
   }, []);
 
@@ -86,13 +87,7 @@ export default function StaffPage() {
     <main className="dashboard-shell">
       <Sidebar active="staff" />
       <section className="content">
-        <header className="topbar">
-          <h1>Staff Dashboard</h1>
-          <div className="top-actions">
-            <label className="search"><span>⌕</span><input aria-label="Search" placeholder="Search members…" /></label>
-            <button className="status">On Duty</button>
-          </div>
-        </header>
+          <Topbar title="Staff Dashboard" searchPlaceholder="Search members…" />
 
         <div className="page-body">
           <div className="metrics">
@@ -218,15 +213,27 @@ export default function StaffPage() {
                 <div className="panel-heading"><h2>Client Members</h2><span style={{ fontSize: 9, color: "#505660" }}>{clients.length} total</span></div>
                 {loading
                   ? <div style={{ padding: "24px 14px", textAlign: "center", color: "#505660", fontSize: 9 }}>Loading…</div>
-                  : clients.slice(0, 8).map(c => (
-                  <div key={c.id} className="member">
-                    <div className={`avatar avatar-${c.avatar_color}`}>{c.avatar_initials}</div>
-                    <div>
-                      <strong>{c.full_name}</strong>
-                      <small style={{ color: "#505660" }}>{c.title}</small>
-                    </div>
-                  </div>
-                ))}
+                  : clients.length === 0
+                  ? <Empty message="No client members found" />
+                  : clients.slice(0, 8).map(c => {
+                    const mem = c.memberships?.[0];
+                    const planLabel = mem?.plan ?? null;
+                    const isActive  = mem?.status === "active";
+                    return (
+                      <div key={c.id} className="member">
+                        <div className={`avatar avatar-${c.avatar_color}`}>{c.avatar_initials}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong>{c.full_name}</strong>
+                          <small style={{ color: "#505660" }}>{c.title}</small>
+                        </div>
+                        {planLabel && (
+                          <span className={`member-badge badge-${planLabel}`} style={{ opacity: isActive ? 1 : 0.45 }}>
+                            {planLabel}{!isActive ? " · inactive" : ""}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 {clients.length > 8 && (
                   <div style={{ padding: "10px 14px", fontSize: 8, color: "#505660", textAlign: "center" }}>
                     +{clients.length - 8} more members
