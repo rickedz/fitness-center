@@ -131,18 +131,7 @@ export default function SignupPage() {
       return;
     }
 
-    // Send OTP for verification
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: fields.email,
-      options: { shouldCreateUser: false },
-    });
-
     setLoading(false);
-
-    if (otpError) {
-      setGlobalError("Account created but failed to send verification code. Please sign in.");
-      return;
-    }
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
