@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/lib/supabase/client";
-import { ROLE_COOKIE, SESSION_KEY, buildSessionUser, type Profile } from "@/app/lib/auth";
+import { ROLE_COOKIE, SESSION_KEY, buildSessionUser } from "@/app/lib/auth";
 import OtpStep from "@/app/components/OtpStep";
 
 interface Fields {
@@ -30,8 +30,7 @@ export default function SignupPage() {
   const [success, setSuccess]                   = useState(false);
   const [successMessage, setSuccessMessage]     = useState("");
   const [otpPending, setOtpPending]             = useState(false);
-  const [pendingUser, setPendingUser]           = useState<{ id: string; email?: string } | null>(null);
-  const [pendingProfile, setPendingProfile]     = useState<Profile | null>(null);
+  const [pendingEmail, setPendingEmail]         = useState("");
   const [fields, setFields]                     = useState<Fields>({
     firstName: "", lastName: "", email: "", password: "", confirmPassword: "", terms: false,
   });
@@ -132,27 +131,20 @@ export default function SignupPage() {
     }
 
     setLoading(false);
-
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", authData.user.id)
-      .single();
-
-    if (profileError || !profile) {
-      setGlobalError("Account created, but profile could not be loaded. Please sign in.");
-      return;
-    }
-
-    setPendingUser(authData.user);
-    setPendingProfile(profile as Profile);
+    setPendingEmail(fields.email);
     setOtpPending(true);
   }
 
-  function handleOtpVerified() {
-    if (!pendingUser || !pendingProfile) return;
+  async function handleOtpVerified() {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setGlobalError("Session not found. Please sign in."); setOtpPending(false); return; }
+
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+    if (!profile) { setGlobalError("Profile not found. Please sign in."); setOtpPending(false); return; }
+
     document.cookie = `${ROLE_COOKIE}=client; path=/; SameSite=Lax`;
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(buildSessionUser(pendingUser, pendingProfile)));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(buildSessionUser(user, profile as Profile)));
     setSuccess(true);
     setSuccessMessage("Account verified! Redirecting…");
     setTimeout(() => router.push("/client"), 1000);
@@ -198,7 +190,7 @@ export default function SignupPage() {
             </div>
           ) : (
             <OtpStep
-              email={fields.email}
+              email={pendingEmail}
               onVerified={handleOtpVerified}
               onBack={() => setOtpPending(false)}
             />
