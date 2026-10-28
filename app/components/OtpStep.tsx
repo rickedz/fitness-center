@@ -56,7 +56,7 @@ export default function OtpStep({ email, onVerified, onBack }: Props) {
     const { error: verifyError } = await createClient().auth.verifyOtp({
       email,
       token,
-      type: "signup",
+      type: "email",
     });
 
     setLoading(false);

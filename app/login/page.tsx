@@ -67,16 +67,6 @@ export default function LoginPage() {
 
     const typedProfile = profile as Profile;
 
-    // Admin skips OTP
-    if (typedProfile.role === "admin") {
-      const maxAge = fields.remember ? "; max-age=604800" : "";
-      document.cookie = `${ROLE_COOKIE}=${typedProfile.role}; path=/; SameSite=Lax${maxAge}`;
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(buildSessionUser(authData.user, typedProfile)));
-      router.push(homeForRole(typedProfile.role as Role));
-      return;
-    }
-
-    // Staff and client: send OTP
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email: fields.email,
       options: { shouldCreateUser: false },
