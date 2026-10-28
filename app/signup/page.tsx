@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/lib/supabase/client";
-import { ROLE_COOKIE, SESSION_KEY, buildSessionUser } from "@/app/lib/auth";
+import { ROLE_COOKIE, SESSION_KEY, buildSessionUser, type Profile } from "@/app/lib/auth";
 import OtpStep from "@/app/components/OtpStep";
 
 interface Fields {
