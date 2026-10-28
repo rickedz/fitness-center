@@ -73,7 +73,7 @@ export default function OtpStep({ email, onVerified, onBack }: Props) {
     if (resendCooldown > 0) return;
     setResendCooldown(60);
     setError("");
-    await createClient().auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    await createClient().auth.resend({ type: "signup", email });
   }
 
   return (

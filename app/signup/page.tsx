@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/app/lib/supabase/client";
-import { ROLE_COOKIE, SESSION_KEY, buildSessionUser, type Profile } from "@/app/lib/auth";
-import OtpStep from "@/app/components/OtpStep";
+
 
 interface Fields {
   firstName:       string;
@@ -19,7 +17,6 @@ interface Fields {
 type FieldErrors = Partial<Record<keyof Fields, string>>;
 
 export default function SignupPage() {
-  const router = useRouter();
   const [showPassword, setShowPassword]         = useState(false);
   const [showConfirm, setShowConfirm]           = useState(false);
   const [loading, setLoading]                   = useState(false);
@@ -29,8 +26,6 @@ export default function SignupPage() {
   const [fieldErrors, setFieldErrors]           = useState<FieldErrors>({});
   const [success, setSuccess]                   = useState(false);
   const [successMessage, setSuccessMessage]     = useState("");
-  const [otpPending, setOtpPending]             = useState(false);
-  const [pendingEmail, setPendingEmail]         = useState("");
   const [fields, setFields]                     = useState<Fields>({
     firstName: "", lastName: "", email: "", password: "", confirmPassword: "", terms: false,
   });
@@ -131,23 +126,8 @@ export default function SignupPage() {
     }
 
     setLoading(false);
-    setPendingEmail(fields.email);
-    setOtpPending(true);
-  }
-
-  async function handleOtpVerified() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setGlobalError("Session not found. Please sign in."); setOtpPending(false); return; }
-
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-    if (!profile) { setGlobalError("Profile not found. Please sign in."); setOtpPending(false); return; }
-
-    document.cookie = `${ROLE_COOKIE}=client; path=/; SameSite=Lax`;
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(buildSessionUser(user, profile as Profile)));
     setSuccess(true);
-    setSuccessMessage("Account verified! Redirecting…");
-    setTimeout(() => router.push("/client"), 1000);
+    setSuccessMessage("Account created! Check your email and click the confirmation link to activate your account.");
   }
 
   async function handleResendConfirmation() {
@@ -171,33 +151,6 @@ export default function SignupPage() {
     setExistingAccount(false);
     setSuccess(true);
     setSuccessMessage("Confirmation email sent. Open it to verify your address, then sign in.");
-  }
-
-  if (otpPending) {
-    return (
-      <main className="auth-page">
-        <div className="auth-glow auth-glow-one" />
-        <div className="auth-glow auth-glow-two" />
-        <section className="auth-card auth-card-animate">
-          <Link className="auth-brand" href="/login" aria-label="GritFit">
-            <span className="brand-mark">✦</span>
-            <span>GRITFIT<small>FITNESS CENTER</small></span>
-          </Link>
-          {success ? (
-            <div role="status" className="auth-alert auth-alert-success" style={{ marginTop: 32 }}>
-              <span className="auth-alert-icon">✓</span>
-              <span>{successMessage}</span>
-            </div>
-          ) : (
-            <OtpStep
-              email={pendingEmail}
-              onVerified={handleOtpVerified}
-              onBack={() => setOtpPending(false)}
-            />
-          )}
-        </section>
-      </main>
-    );
   }
 
   return (
