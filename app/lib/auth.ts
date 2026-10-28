@@ -38,7 +38,7 @@ export const ROLE_ROUTES: Record<Role, string[]> = {
   admin:   ["/", "/revenue", "/classes", "/trainers", "/billing", "/admin/users", "/staff", "/client", "/trainer", "/profile"],
   staff:   ["/staff", "/classes", "/trainers", "/profile"],
   trainer: ["/trainer", "/classes", "/trainers", "/profile"],
-  client:  ["/client", "/profile"],
+  client:  ["/client"],
 };
 
 export const ALL_PROTECTED = [

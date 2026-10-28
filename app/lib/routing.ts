@@ -15,18 +15,19 @@ export function applyRouting(
 ): NextResponse {
   const { pathname } = request.nextUrl;
   const role = request.cookies.get(ROLE_COOKIE)?.value as Role | undefined;
+  const isAuthenticated = Boolean(user) || Boolean(role);
 
-  if (AUTH_ROUTES.includes(pathname) && user && role) {
+  if (AUTH_ROUTES.includes(pathname) && isAuthenticated && role) {
     return NextResponse.redirect(new URL(homeForRole(role), request.url));
   }
 
-  if (ALL_PROTECTED.includes(pathname) && !user) {
+  if (ALL_PROTECTED.includes(pathname) && !isAuthenticated) {
     const url = new URL("/login", request.url);
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  if (ALL_PROTECTED.includes(pathname) && user && role) {
+  if (ALL_PROTECTED.includes(pathname) && role) {
     const allowed = ROLE_ROUTES[role] ?? [];
     if (!allowed.includes(pathname)) {
       return NextResponse.redirect(new URL(homeForRole(role), request.url));
